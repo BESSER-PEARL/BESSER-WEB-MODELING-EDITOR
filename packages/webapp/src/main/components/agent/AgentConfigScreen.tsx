@@ -86,6 +86,12 @@ const Section = styled.div`
   }
 `;
 
+const StackedSectionColumn = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+`;
+
 const SectionTitle = styled.h5`
   color: var(--apollon-primary-contrast);
   margin: 0 0 20px 0;
@@ -1173,78 +1179,66 @@ export const AgentConfigScreen: React.FC = () => {
                         </Row>
 
                     </Section>
-                    <Section>
-                        <SectionTitle>Modality</SectionTitle>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Input Modalities</Form.Label>
-                                    <div>
-                                        <Form.Check
-                                            type="checkbox"
-                                            label="Text"
-                                            value="text"
-                                            checked={inputModalities.includes('text')}
-                                            onChange={handleInputModalityChange}
-                                        />
-                                        <Form.Check
-                                            type="checkbox"
-                                            label="Speech"
-                                            value="speech"
-                                            checked={inputModalities.includes('speech')}
-                                            onChange={handleInputModalityChange}
-                                        />
-                                    </div>
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Output Modalities</Form.Label>
-                                    <div>
-                                        <Form.Check
-                                            type="checkbox"
-                                            label="Text"
-                                            value="text"
-                                            checked={outputModalities.includes('text')}
-                                            onChange={handleOutputModalityChange}
-                                        />
-                                        <Form.Check
-                                            type="checkbox"
-                                            label="Speech"
-                                            value="speech"
-                                            checked={outputModalities.includes('speech')}
-                                            onChange={handleOutputModalityChange}
-                                        />
-                                    </div>
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                    </Section>
-                    <Section>
-                        <SectionTitle>Behavior</SectionTitle>
-                        <Row>
-                            <Col md={4}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Response Timing</Form.Label>
-                                    <Form.Select value={responseTiming} onChange={e => setResponseTiming(e.target.value)}>
-                                        <option value="instant">Instant</option>
-                                        <option value="delayed">Simulated Thinking</option>
-                                    </Form.Select>
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                    </Section>
-                    <Section>
-                        <SectionTitle>Content</SectionTitle>
-                        <Form.Group className="mb-3">
-                            <Form.Check
-                                type="switch"
-                                id="adaptContentToUserProfile"
-                                label="Adapt content to user profile"
-                                checked={adaptContentToUserProfile}
+                    <StackedSectionColumn>
+                        <Section>
+                            <SectionTitle>Modality</SectionTitle>
+                            <Row>
+                                <Col md={6}>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Input Modalities</Form.Label>
+                                        <div>
+                                            <Form.Check
+                                                type="checkbox"
+                                                label="Text"
+                                                value="text"
+                                                checked={inputModalities.includes('text')}
+                                                onChange={handleInputModalityChange}
+                                            />
+                                            <Form.Check
+                                                type="checkbox"
+                                                label="Speech"
+                                                value="speech"
+                                                checked={inputModalities.includes('speech')}
+                                                onChange={handleInputModalityChange}
+                                            />
+                                        </div>
+                                    </Form.Group>
+                                </Col>
+                                <Col md={6}>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Output Modalities</Form.Label>
+                                        <div>
+                                            <Form.Check
+                                                type="checkbox"
+                                                label="Text"
+                                                value="text"
+                                                checked={outputModalities.includes('text')}
+                                                onChange={handleOutputModalityChange}
+                                            />
+                                            <Form.Check
+                                                type="checkbox"
+                                                label="Speech"
+                                                value="speech"
+                                                checked={outputModalities.includes('speech')}
+                                                onChange={handleOutputModalityChange}
+                                            />
+                                        </div>
+                                    </Form.Group>
+                                </Col>
+                            </Row>
+                        </Section>
+
+                        <Section>
+                            <SectionTitle>Content</SectionTitle>
+                            <Form.Group className="mb-3">
+                                <Form.Check
+                                    type="switch"
+                                    id="adaptContentToUserProfile"
+                                    label="Adapt content to user profile"
+                                    checked={adaptContentToUserProfile}
                                     onChange={e => handleAdaptContentToggle(e.target.checked)}
-                            />
-                        </Form.Group>
+                                />
+                            </Form.Group>
                             {adaptContentToUserProfile && (
                                 <Form.Group className="mb-3">
                                     <Form.Label>Select user profile</Form.Label>
@@ -1266,10 +1260,27 @@ export const AgentConfigScreen: React.FC = () => {
                                     )}
                                 </Form.Group>
                             )}
-                        <Form.Text className="text-muted">
-                            Enable this option to tailor generated responses to the active user profile. This option requires user profiles to be defined. You'll have then to select a profile and attributes you think are relevant for the agent to consider when adapting responses.
-                        </Form.Text>
-                    </Section>
+                            <Form.Text className="text-muted">
+                                Enable this option to tailor generated responses to the active user profile. This option requires user profiles to be defined. You'll have then to select a profile and attributes you think are relevant for the agent to consider when adapting responses.
+                            </Form.Text>
+                        </Section>
+
+                        <Section>
+                            <SectionTitle>Behavior</SectionTitle>
+                            <Row>
+                                <Col md={4}>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Response Timing</Form.Label>
+                                        <Form.Select value={responseTiming} onChange={e => setResponseTiming(e.target.value)}>
+                                            <option value="instant">Instant</option>
+                                            <option value="delayed">Simulated Thinking</option>
+                                        </Form.Select>
+                                    </Form.Group>
+                                </Col>
+                            </Row>
+                        </Section>
+                    </StackedSectionColumn>
+                  
                     <Section style={{ gridColumn: '1 / -1' }}>
                         <SectionTitle>System Configuration</SectionTitle>
                         <Row>
