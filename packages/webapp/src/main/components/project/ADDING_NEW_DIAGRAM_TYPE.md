@@ -2,6 +2,19 @@
 
 This guide explains how to add a new UML diagram type (e.g., `SyntaxTree`, `Flowchart`, `BPMN`) to the webapp sidebar and project system.
 
+## Before you start
+
+This checklist wires an **existing** `UMLDiagramType` from the editor package into the webapp UI.
+
+If you are adding a **brand-new** diagram type or DSL:
+
+- Extend the editor package first (`packages/editor`), including diagram type registration, elements, rendering, palette, and translations.
+- Add backend processing in the BESSER repository (`besser/utilities/web_modeling_editor/backend`).
+
+References:
+- WME docs: https://besser.readthedocs.io/projects/besser-web-modeling-editor/en/latest/contributing/new-diagram-guide/index.html
+- BESSER docs: https://besser.readthedocs.io/en/latest/contributing/create_dsl.html
+
 ## Overview
 
 Adding a new diagram type requires modifications to **5 files** in the frontend, plus **backend integration**.
@@ -237,14 +250,19 @@ Without the backend parser:
 
 **Action:**
 - Locate the BESSER backend repository.
-- Implement a parser for your new `UMLDiagramType` (e.g., `SyntaxTree`).
+- Implement a parser for your new `UMLDiagramType` (e.g., `SyntaxTree`) under
+  `besser/utilities/web_modeling_editor/backend/services/converters/json_to_buml`.
 - Ensure the backend can accept and process the JSON structure produced by the frontend editor for this diagram type.
+- If the diagram is part of a project payload, update
+  `besser/utilities/web_modeling_editor/backend/services/converters/json_to_buml/project_converter.py`
+  and (if needed) the BUML -> JSON project converter.
 
 ---
 
 ## Available UML Diagram Types
 
-The following `UMLDiagramType` values are available in `@besser/wme`:
+The following `UMLDiagramType` values are available in `@besser/wme` (see
+`packages/editor/src/main/packages/diagram-type.ts`):
 
 | Type | Value |
 |------|-------|
