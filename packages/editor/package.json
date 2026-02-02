@@ -14,7 +14,7 @@
   "main": "lib/es5/index.js",
   "module": "lib/es6/index.js",
   "typings": "lib/es6/index.d.ts",
-  "repository": "github:BESSER-PEARL/BESSER-Web-Modeling-Editor",
+  "repository": "github:BESSER-PEARL/BESSER-WEB-MODELING-EDITOR",
   "sideEffects": false,
   "engines": {
     "node": ">=20.0.0"
