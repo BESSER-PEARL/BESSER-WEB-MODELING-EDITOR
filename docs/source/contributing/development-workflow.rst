@@ -21,17 +21,34 @@ Use the workspace root. npm installs all packages declared in ``workspaces``.
 3. Run automated checks
 -----------------------
 
-===========  ===============================================  ===============================================
-Command      Description                                      Location
-===========  ===============================================  ===============================================
-``npm run lint``          Runs ESLint for webapp + server      root workspace
-``npm run lint --workspace=editor``     Lints the editor package             editor
-``npm run lint --workspace=webapp``     Lints the React app                  webapp
-``npm run lint --workspace=server``     Lints the Express server             server
-``npm run prettier:check``              Verifies formatting                  root workspace
-``npm run build:webapp``                Production bundle for UI             webapp
-``npm run build:server``                Bundles Express server               server
-===========  ===============================================  ===============================================
+.. list-table::
+   :header-rows: 1
+   :widths: 30 50 20
+
+   * - Command
+     - Description
+     - Location
+   * - ``npm run lint``
+     - Runs ESLint for webapp + server
+     - root workspace
+   * - ``npm run lint --workspace=editor``
+     - Lints the editor package
+     - editor
+   * - ``npm run lint --workspace=webapp``
+     - Lints the React app
+     - webapp
+   * - ``npm run lint --workspace=server``
+     - Lints the Express server
+     - server
+   * - ``npm run prettier:check``
+     - Verifies formatting
+     - root workspace
+   * - ``npm run build:webapp``
+     - Production bundle for UI
+     - webapp
+   * - ``npm run build:server``
+     - Bundles Express server
+     - server
 
 When contributing to the editor, run package-specific checks:
 

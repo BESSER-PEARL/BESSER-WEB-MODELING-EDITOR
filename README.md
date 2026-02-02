@@ -66,7 +66,7 @@ This separation allows the application to focus on delivering additional capabil
 
 - Diagram sharing modes
 - Template management
-- Export/import/generationn to multiple formats
+- Export/import/generation to multiple formats
 - Hosting via application server or Docker
 - Redis-based storage
 

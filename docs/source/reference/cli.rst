@@ -7,24 +7,40 @@ Root scripts
 ``package.json`` at the workspace root defines scripts that orchestrate the
 packages via npm workspaces.
 
-===========  ============================================================
-Script       Description
-===========  ============================================================
-``npm run dev``             Runs the webapp dev server and Express server concurrently.
-``npm run start:webapp``    Alias for ``npm run start --workspace=webapp``.
-``npm run start:server``    Launches the Express server with ``tsx watch``.
-``npm run build``           Produces production bundles for the webapp and server.
-``npm run build:local``     Similar to ``build`` but bundles the webapp with a local ``DEPLOYMENT_URL``.
-``npm run build:webapp``    Runs the webapp's production webpack build.
-``npm run build:webapp:local``  Builds the webapp with ``DEPLOYMENT_URL=http://localhost:8080``.
-``npm run build:server``    Bundles the Express server via webpack.
-``npm run lint``            Runs ESLint for the webapp and server packages.
-``npm run lint:webapp``     Runs ESLint in the webapp workspace.
-``npm run lint:server``     Runs ESLint in the server workspace.
-``npm run prettier:check``  Validates formatting across all packages.
-``npm run prettier:write``  Applies formatting fixes.
-``npm run update``          Uses ``npm-check-updates`` to refresh dependency versions interactively.
-===========  ============================================================
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Script
+     - Description
+   * - ``npm run dev``
+     - Runs the webapp dev server and Express server concurrently.
+   * - ``npm run start:webapp``
+     - Alias for ``npm run start --workspace=webapp``.
+   * - ``npm run start:server``
+     - Launches the Express server with ``tsx watch``.
+   * - ``npm run build``
+     - Produces production bundles for the webapp and server.
+   * - ``npm run build:local``
+     - Similar to ``build`` but bundles the webapp with a local ``DEPLOYMENT_URL``.
+   * - ``npm run build:webapp``
+     - Runs the webapp's production webpack build.
+   * - ``npm run build:webapp:local``
+     - Builds the webapp with ``DEPLOYMENT_URL=http://localhost:8080``.
+   * - ``npm run build:server``
+     - Bundles the Express server via webpack.
+   * - ``npm run lint``
+     - Runs ESLint for the webapp and server packages.
+   * - ``npm run lint:webapp``
+     - Runs ESLint in the webapp workspace.
+   * - ``npm run lint:server``
+     - Runs ESLint in the server workspace.
+   * - ``npm run prettier:check``
+     - Validates formatting across all packages.
+   * - ``npm run prettier:write``
+     - Applies formatting fixes.
+   * - ``npm run update``
+     - Uses ``npm-check-updates`` to refresh dependency versions interactively.
 
 Package-specific scripts
 ------------------------
