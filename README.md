@@ -68,7 +68,6 @@ This separation allows the application to focus on delivering additional capabil
 - Template management
 - Export/import/generation to multiple formats
 - Hosting via application server or Docker
-- Redis-based storage
 
 Meanwhile, all diagram rendering and editing logic is delegated to the core engine, ensuring consistency and reusability
 across multiple front-ends or integrations.
