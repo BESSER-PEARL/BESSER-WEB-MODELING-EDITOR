@@ -425,7 +425,7 @@
               },
               "isManuallyLayouted": false,
               "condition": "when_intent_matched",
-              "conditionValue": "Muscles"
+              "conditionValue": "Muscles_intent"
             },
             "7d65df96-e669-4fc6-a882-dbfe92a57073": {
               "id": "7d65df96-e669-4fc6-a882-dbfe92a57073",
@@ -667,7 +667,7 @@
               },
               "isManuallyLayouted": false,
               "condition": "when_intent_matched",
-              "conditionValue": "Nutrition"
+              "conditionValue": "Nutrition_intent"
             }
            },
   "assessments": {}

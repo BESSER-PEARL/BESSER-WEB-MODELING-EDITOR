@@ -33,7 +33,7 @@ const defaultVoiceStyle: VoiceStyleSetting = {
     speed: 1,
 };
 
-const defaultIntentRecognitionTechnology: IntentRecognitionTechnology = 'classical';
+const defaultIntentRecognitionTechnology: IntentRecognitionTechnology = 'llm-based';
 
 const PageContainer = styled.div`
   padding: 32px 40px;
@@ -266,8 +266,8 @@ export const AgentConfigScreen: React.FC = () => {
     const [initialLoad] = useState(loadInitialState);
     const initialConfig = initialLoad.config;
     const initialSavedConfigs = initialLoad.savedConfigs;
-    const initialLLMProvider: AgentLLMProvider = 'provider' in initialConfig.llm ? initialConfig.llm.provider : '';
-    const initialLLMModelValue = 'provider' in initialConfig.llm ? initialConfig.llm.model : '';
+    const initialLLMProvider: AgentLLMProvider = 'provider' in initialConfig.llm ? initialConfig.llm.provider : 'openai';
+    const initialLLMModelValue = 'provider' in initialConfig.llm ? initialConfig.llm.model : 'gpt-5';
     const useCustomModelInitially = Boolean(initialLLMProvider && initialLLMModelValue && !knownLLMModels.includes(initialLLMModelValue));
     const derivedInitialModel = useCustomModelInitially ? 'other' : initialLLMModelValue;
     const derivedInitialCustomModel = useCustomModelInitially ? initialLLMModelValue : '';
