@@ -203,6 +203,9 @@ function setupEditorFeatures(
     console.warn('[GraphicalUIEditor] Pages API not available');
   }
   
+  setupSidebarButtonHoverLabels(editor);
+  setupAutoOpenTraitsPanel(editor);
+  
   // Additional features
   setupDataBindingTraits(editor);
   setupCustomTraits(editor);
@@ -1299,6 +1302,141 @@ function setupPageRouting(editor: Editor) {
       }
     }
   });
+}
+
+// ============================================
+// SIDEBAR HOVER LABELS
+// ============================================
+
+/**
+ * Add hover labels for GrapesJS sidebar buttons.
+ */
+function setupSidebarButtonHoverLabels(editor: Editor) {
+  editor.on('load', () => {
+    const labelOverrides: Record<string, string> = {
+      'open-blocks': 'Blocks',
+      'open-sm': 'Styles',
+      'open-tm': 'Traits',
+      'open-layers': 'Layers',
+      'open-pages-tab': 'Pages',
+    };
+    
+    const selector = '.gjs-pn-views .gjs-pn-btn, .gjs-pn-commands .gjs-pn-btn';
+    const measurementEl = createTooltipMeasurementElement();
+    
+    const updatePlacement = (button: HTMLElement, label: string) => {
+      measurementEl.textContent = label;
+      const tooltipWidth = measurementEl.getBoundingClientRect().width;
+      const rect = button.getBoundingClientRect();
+      const rightSpace = window.innerWidth - rect.right;
+      const leftSpace = rect.left;
+      const prefersRight = rightSpace >= tooltipWidth + 12;
+      const prefersLeft = leftSpace >= tooltipWidth + 12;
+      const placement = prefersRight ? 'right' : prefersLeft ? 'left' : 'right';
+      button.setAttribute('data-tooltip-placement', placement);
+    };
+    
+    document.querySelectorAll<HTMLElement>(selector).forEach((button) => {
+      const label = resolveSidebarButtonLabel(button, labelOverrides);
+      if (!label) return;
+      
+      button.setAttribute('data-tooltip', label);
+      button.setAttribute('aria-label', label);
+      updatePlacement(button, label);
+      
+      button.addEventListener('mouseenter', () => updatePlacement(button, label));
+      button.addEventListener('focus', () => updatePlacement(button, label));
+      
+      if (button.getAttribute('title')) {
+        button.removeAttribute('title');
+      }
+    });
+    
+    const handleResize = () => {
+      document.querySelectorAll<HTMLElement>(selector).forEach((button) => {
+        const label = button.getAttribute('data-tooltip');
+        if (!label) return;
+        updatePlacement(button, label);
+      });
+    };
+    
+    window.addEventListener('resize', handleResize);
+    editor.on('destroy', () => {
+      window.removeEventListener('resize', handleResize);
+    });
+  });
+}
+
+// ============================================
+// PANEL AUTO-SELECTION
+// ============================================
+
+/**
+ * Ensure Traits (Settings) panel opens when a component is selected.
+ */
+function setupAutoOpenTraitsPanel(editor: Editor) {
+  const openTraitsPanel = () => {
+    const panels = editor.Panels;
+    const traitsButton = panels?.getButton?.('views', 'open-tm');
+    const stylesButton = panels?.getButton?.('views', 'open-sm');
+
+    if (stylesButton?.get('active')) {
+      stylesButton.set('active', false);
+    }
+    if (traitsButton && !traitsButton.get('active')) {
+      traitsButton.set('active', true);
+    }
+    editor.runCommand('open-tm');
+  };
+
+  editor.on('load', () => {
+    openTraitsPanel();
+  });
+
+  editor.on('component:selected', (component: any) => {
+    if (!component) return;
+    // Let GrapesJS finish its own selection logic before forcing traits open.
+    setTimeout(openTraitsPanel, 0);
+  });
+}
+
+function createTooltipMeasurementElement(): HTMLDivElement {
+  let measurementEl = document.getElementById('gjs-tooltip-measure') as HTMLDivElement | null;
+  if (measurementEl) return measurementEl;
+  
+  measurementEl = document.createElement('div');
+  measurementEl.id = 'gjs-tooltip-measure';
+  measurementEl.style.position = 'fixed';
+  measurementEl.style.top = '-9999px';
+  measurementEl.style.left = '-9999px';
+  measurementEl.style.whiteSpace = 'nowrap';
+  measurementEl.style.fontSize = '11px';
+  measurementEl.style.lineHeight = '1';
+  measurementEl.style.padding = '6px 8px';
+  measurementEl.style.fontFamily = 'inherit';
+  measurementEl.style.fontWeight = '500';
+  measurementEl.style.visibility = 'hidden';
+  document.body.appendChild(measurementEl);
+  return measurementEl;
+}
+
+function resolveSidebarButtonLabel(
+  button: HTMLElement,
+  labelOverrides: Record<string, string>
+): string | null {
+  const existingLabel = button.getAttribute('data-tooltip')
+    || button.getAttribute('aria-label')
+    || button.getAttribute('title');
+  if (existingLabel) return existingLabel;
+  
+  const id = button.getAttribute('id');
+  if (!id) return null;
+  if (labelOverrides[id]) return labelOverrides[id];
+  
+  const cleaned = id.replace(/^open-/, '').replace(/-/g, ' ').trim();
+  if (!cleaned) return null;
+  
+  return cleaned.replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 // ============================================
