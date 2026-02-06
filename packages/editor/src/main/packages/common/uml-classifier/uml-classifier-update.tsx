@@ -344,7 +344,8 @@ class ClassifierUpdate extends Component<Props, State> {
       bounds: element.bounds,
       ownedElements: element.ownedElements,
     });
-    update(element.id, instance);
+    // Cast needed: Redux stores plain objects, not class instances
+    update(element.id, instance as any);
   };
 
   private delete = (id: string) => () => {
