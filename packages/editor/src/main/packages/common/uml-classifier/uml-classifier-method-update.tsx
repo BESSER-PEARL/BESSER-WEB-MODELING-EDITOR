@@ -13,13 +13,6 @@ import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/material.css';
 import 'codemirror/mode/python/python';
 
-const Flex = styled.div`
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 4px;
-`;
-
 const MethodRow = styled.div`
   display: flex;
   flex-direction: column;
@@ -57,17 +50,6 @@ const CodeButton = styled(Button)`
   padding: 4px 8px;
   font-size: 12px;
   min-width: 60px;
-`;
-
-const MethodNameLabel = styled.span`
-  flex: 1;
-  min-width: 0;
-  padding: 4px 8px;
-  font-size: 13px;
-  color: ${(props) => props.theme.color.primary || '#007bff'};
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 `;
 
 const ImplementationRow = styled.div`
@@ -349,62 +331,38 @@ const UmlMethodUpdate = ({
   };
 
   const visibilityValue = VISIBILITY_OPTIONS.find(v => v.symbol === visibility)?.value || 'public';
-  const hasCode = localCode && localCode.trim().length > 0;
+  const hasCode = localCode.trim().length > 0;
   const isBalImplementation = localImplType === 'bal';
-  const codeImplementationLabel = isBalImplementation ? 'BESSER Action Language' : 'Python Code';
   const codeImplementationTitle = isBalImplementation
     ? 'Method defined in BESSER Action Language code'
     : 'Method defined in Python code';
 
   // Determine display mode based on implementation type
   const showCodeEditor = CODE_BASED_IMPLEMENTATION_TYPES.includes(localImplType);
+  const isSignatureLocked = showCodeEditor;
   const showStateMachineSelector = localImplType === 'state_machine';
   const showQuantumCircuitSelector = localImplType === 'quantum_circuit';
-  const showSignatureFields = localImplType === 'none' || (!hasCode && showCodeEditor);
 
   return (
     <MethodRow>
       <ControlsRow>
-        {/* Show visibility and name fields for signature-based methods */}
-        {showSignatureFields && (
-          <>
-            <VisibilityDropdown value={visibilityValue} onChange={handleVisibilityChange}>
-              {VISIBILITY_OPTIONS.map(vis => (
-                <Dropdown.Item key={vis.value} value={vis.value}>
-                  {vis.label}
-                </Dropdown.Item>
-              ))}
-            </VisibilityDropdown>
-            <NameField 
-              ref={onRefChange} 
-              value={name} 
-              onChange={handleNameChange} 
-              onSubmitKeyUp={onSubmitKeyUp}
-              placeholder="method(param: type): returnType"
-            />
-          </>
-        )}
-        
-        {/* Show method name label when in code mode with code */}
-        {hasCode && showCodeEditor && (
-          <MethodNameLabel title={codeImplementationTitle}>
-            {codeImplementationLabel} {name.split('(')[0] || 'method'}
-          </MethodNameLabel>
-        )}
-
-        {/* Show method name label for state machine reference */}
-        {showStateMachineSelector && (
-          <MethodNameLabel title="Method behavior defined by state machine">
-           StateMachine {name.split('(')[0] || 'method'}
-          </MethodNameLabel>
-        )}
-
-        {/* Show method name label for quantum circuit reference */}
-        {showQuantumCircuitSelector && (
-          <MethodNameLabel title="Method behavior defined by quantum circuit">
-            QuantumCircuit {name.split('(')[0] || 'method'}
-          </MethodNameLabel>
-        )}
+        <VisibilityDropdown value={visibilityValue} onChange={isSignatureLocked ? undefined : handleVisibilityChange}>
+          {VISIBILITY_OPTIONS.map(vis => (
+            <Dropdown.Item key={vis.value} value={vis.value}>
+              {vis.label}
+            </Dropdown.Item>
+          ))}
+        </VisibilityDropdown>
+        <NameField
+          ref={onRefChange}
+          value={name}
+          onChange={handleNameChange}
+          onSubmitKeyUp={onSubmitKeyUp}
+          placeholder="method(param: type): returnType"
+          readonly={isSignatureLocked}
+          readOnly={isSignatureLocked}
+          title={isSignatureLocked ? codeImplementationTitle : undefined}
+        />
 
         <ColorButton onClick={toggleColor} />
         <Button color="link" tabIndex={-1} onClick={handleDelete}>
@@ -414,7 +372,7 @@ const UmlMethodUpdate = ({
 
       {/* Implementation Type Selection Row */}
       <ImplementationRow>
-        <ImplementationLabel>Implementation:</ImplementationLabel>
+        <ImplementationLabel>Type:</ImplementationLabel>
         <ImplementationTypeDropdown 
           value={localImplType} 
           onChange={handleImplementationTypeChange}
@@ -483,7 +441,7 @@ const UmlMethodUpdate = ({
             onClick={toggleCodeEditor}
             title={codeEditorOpen ? "Hide code editor" : "Show code editor"}
           >
-            {codeEditorOpen ? 'Code' : 'Code'}
+            {codeEditorOpen ? 'Hide Editor' : 'Show Editor'}
           </CodeButton>
         )}
       </ImplementationRow>
