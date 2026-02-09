@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import styled from 'styled-components';
 import { Button } from '../../../components/controls/button/button';
 import { ColorButton } from '../../../components/controls/color-button/color-button';
@@ -136,11 +136,21 @@ const VISIBILITY_OPTIONS = [
 ];
 
 const IMPLEMENTATION_TYPE_OPTIONS: { value: MethodImplementationType; label: string; icon: string }[] = [
-  { value: 'none', label: 'None (UML)', icon: '📋' },
-  { value: 'code', label: 'Python Code', icon: '📝' },
+  { value: 'none', label: 'None (UML)', icon: 'ðŸ“‹' },
+  { value: 'code', label: 'Python Code', icon: 'ðŸ“' },
+  { value: 'bal', label: 'BESSER Action Language', icon: '' },
   { value: 'state_machine', label: 'State Machine', icon: '' },
   { value: 'quantum_circuit', label: 'Quantum Circuit', icon: '' },
 ];
+
+const CODE_BASED_IMPLEMENTATION_TYPES: MethodImplementationType[] = ['code', 'bal'];
+
+const getCodeTemplate = (implType: MethodImplementationType, methodName: string) => {
+  if (implType === 'bal') {
+    return `def ${methodName}() -> nothing {\n    // Add your implementation here\n}\n`;
+  }
+  return `def ${methodName}(self):\n    """Add your docstring here."""\n    # Add your implementation here\n    pass\n`;
+};
 
 // Available diagram references (these would be passed as props from the webapp in a real implementation)
 export interface DiagramReference {
@@ -207,7 +217,7 @@ const UmlMethodUpdate = ({
         const methodName = parseMethod(value).name || 'method_name';
         // Extract just the method name without parameters for the template
         const cleanMethodName = methodName.split('(')[0].trim() || 'new_method';
-        const template = `def ${cleanMethodName}(self):\n    """Add your docstring here."""\n    # Add your implementation here\n    pass\n`;
+        const template = getCodeTemplate(localImplType, cleanMethodName);
         setLocalCode(template);
         onChange(id, { code: template });
       }
@@ -257,12 +267,12 @@ const UmlMethodUpdate = ({
   const handleCodeChange = (editor: any, data: any, newCode: string) => {
     setLocalCode(newCode);
     
-    // Extract method name from Python code
+    // Extract method name from code-like definitions (Python and BAL).
     const methodMatch = newCode.match(/def\s+(\w+)\s*\([^)]*\)/);
     if (methodMatch && methodMatch[1]) {
       const extractedMethodName = methodMatch[1];
       // Extract return type if exists
-      const returnTypeMatch = newCode.match(/def\s+\w+\s*\([^)]*\)\s*->\s*([^:]+):/);
+      const returnTypeMatch = newCode.match(/def\s+\w+\s*\([^)]*\)\s*->\s*([^:{]+)\s*[:{]/);
       const returnType = returnTypeMatch ? returnTypeMatch[1].trim() : '';
       
       // Extract parameters
@@ -309,12 +319,12 @@ const UmlMethodUpdate = ({
       setLocalCode('');
       setCodeEditorOpen(false);
       onChange(id, { implementationType: implType, code: '', stateMachineId: '', quantumCircuitId: '' });
-    } else if (implType === 'code') {
+    } else if (CODE_BASED_IMPLEMENTATION_TYPES.includes(implType)) {
       onChange(id, { implementationType: implType, stateMachineId: '', quantumCircuitId: '' });
       if (!localCode) {
         const methodName = parseMethod(value).name || 'method_name';
         const cleanMethodName = methodName.split('(')[0].trim() || 'new_method';
-        const template = `def ${cleanMethodName}(self):\n    """Add your docstring here."""\n    # Add your implementation here\n    pass\n`;
+        const template = getCodeTemplate(implType, cleanMethodName);
         setLocalCode(template);
         onChange(id, { code: template, implementationType: implType });
       }
@@ -340,13 +350,17 @@ const UmlMethodUpdate = ({
 
   const visibilityValue = VISIBILITY_OPTIONS.find(v => v.symbol === visibility)?.value || 'public';
   const hasCode = localCode && localCode.trim().length > 0;
-  const currentImplOption = IMPLEMENTATION_TYPE_OPTIONS.find(opt => opt.value === localImplType);
+  const isBalImplementation = localImplType === 'bal';
+  const codeImplementationLabel = isBalImplementation ? 'BESSER Action Language' : 'Python Code';
+  const codeImplementationTitle = isBalImplementation
+    ? 'Method defined in BESSER Action Language code'
+    : 'Method defined in Python code';
 
   // Determine display mode based on implementation type
-  const showCodeEditor = localImplType === 'code';
+  const showCodeEditor = CODE_BASED_IMPLEMENTATION_TYPES.includes(localImplType);
   const showStateMachineSelector = localImplType === 'state_machine';
   const showQuantumCircuitSelector = localImplType === 'quantum_circuit';
-  const showSignatureFields = localImplType === 'none' || (!hasCode && localImplType === 'code');
+  const showSignatureFields = localImplType === 'none' || (!hasCode && showCodeEditor);
 
   return (
     <MethodRow>
@@ -372,9 +386,9 @@ const UmlMethodUpdate = ({
         )}
         
         {/* Show method name label when in code mode with code */}
-        {hasCode && localImplType === 'code' && (
-          <MethodNameLabel title="Method defined in Python code">
-            Python Code {name.split('(')[0] || 'method'}
+        {hasCode && showCodeEditor && (
+          <MethodNameLabel title={codeImplementationTitle}>
+            {codeImplementationLabel} {name.split('(')[0] || 'method'}
           </MethodNameLabel>
         )}
 
@@ -469,7 +483,7 @@ const UmlMethodUpdate = ({
             onClick={toggleCodeEditor}
             title={codeEditorOpen ? "Hide code editor" : "Show code editor"}
           >
-            {codeEditorOpen ? '▼ Code' : '▶ Code'}
+            {codeEditorOpen ? 'â–¼ Code' : 'â–¶ Code'}
           </CodeButton>
         )}
       </ImplementationRow>
@@ -478,7 +492,9 @@ const UmlMethodUpdate = ({
       {codeEditorOpen && showCodeEditor && (
         <CodeEditorWrapper>
           <CodeEditorHeader>
-            <CodeEditorTitle>Python Implementation (full method definition)</CodeEditorTitle>
+            <CodeEditorTitle>
+              {isBalImplementation ? 'BESSER Action Language' : 'Python'} Implementation (full method definition)
+            </CodeEditorTitle>
             <div>
               {hasCode && (
                 <Button color="link" onClick={clearCode} style={{ padding: '2px 6px', fontSize: '10px', marginRight: '4px' }}>

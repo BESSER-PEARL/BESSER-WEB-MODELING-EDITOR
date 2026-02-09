@@ -1,4 +1,4 @@
-import { DeepPartial } from 'redux';
+﻿import { DeepPartial } from 'redux';
 import { ILayer } from '../../../services/layouter/layer';
 import { ILayoutable } from '../../../services/layouter/layoutable';
 import { IUMLElement, UMLElement } from '../../../services/uml-element/uml-element';
@@ -54,7 +54,12 @@ const SYMBOL_TO_VISIBILITY: Record<string, Visibility> = {
   '~': 'package',
 };
 
-export type MethodImplementationType = 'none' | 'code' | 'state_machine' | 'quantum_circuit';
+export type MethodImplementationType =
+  | 'none'
+  | 'code'
+  | 'bal'
+  | 'state_machine'
+  | 'quantum_circuit';
 
 export interface IUMLClassifierMember extends IUMLElement {
   code?: string;
