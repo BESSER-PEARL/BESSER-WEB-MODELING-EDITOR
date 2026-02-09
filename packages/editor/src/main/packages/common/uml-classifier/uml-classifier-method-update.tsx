@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
 import { Button } from '../../../components/controls/button/button';
 import { ColorButton } from '../../../components/controls/color-button/color-button';
@@ -136,8 +136,8 @@ const VISIBILITY_OPTIONS = [
 ];
 
 const IMPLEMENTATION_TYPE_OPTIONS: { value: MethodImplementationType; label: string; icon: string }[] = [
-  { value: 'none', label: 'None (UML)', icon: 'ðŸ“‹' },
-  { value: 'code', label: 'Python Code', icon: 'ðŸ“' },
+  { value: 'none', label: 'None (UML)', icon: '' },
+  { value: 'code', label: 'Python Code', icon: '' },
   { value: 'bal', label: 'BESSER Action Language', icon: '' },
   { value: 'state_machine', label: 'State Machine', icon: '' },
   { value: 'quantum_circuit', label: 'Quantum Circuit', icon: '' },
@@ -483,7 +483,7 @@ const UmlMethodUpdate = ({
             onClick={toggleCodeEditor}
             title={codeEditorOpen ? "Hide code editor" : "Show code editor"}
           >
-            {codeEditorOpen ? 'â–¼ Code' : 'â–¶ Code'}
+            {codeEditorOpen ? 'Code' : 'Code'}
           </CodeButton>
         )}
       </ImplementationRow>
