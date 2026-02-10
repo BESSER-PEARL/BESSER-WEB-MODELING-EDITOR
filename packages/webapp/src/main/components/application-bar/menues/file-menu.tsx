@@ -1,6 +1,7 @@
 import React, { useContext, useState } from 'react';
 import { useImportDiagramPictureFromImage } from '../../../services/import/useImportDiagramPicture';
 import { useImportDiagramFromKG } from '../../../services/import/useImportDiagramKG';
+import { useImportDiagramFromOWL } from '../../../services/import/useImportDiagramOWL';
 import { Dropdown, NavDropdown, Modal, Spinner } from 'react-bootstrap';
 import { ApollonEditorContext } from '../../apollon-editor-component/apollon-editor-context';
 import { ModalContentType } from '../../modals/application-modal-types';
@@ -36,12 +37,14 @@ export const FileMenu: React.FC = () => {
   const handleImportDiagramToProject = useImportDiagramToProjectWorkflow();
   const importDiagramPictureFromImage = useImportDiagramPictureFromImage();
   const importDiagramFromKG = useImportDiagramFromKG();
+  const importDiagramFromOWL = useImportDiagramFromOWL();
 
   // Modal state for feedback and input
-  const [importModalType, setImportModalType] = React.useState<'image' | 'kg' | null>(null);
+  const [importModalType, setImportModalType] = React.useState<'image' | 'kg' | 'owl' | null>(null);
   const [showImportModal, setShowImportModal] = React.useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [apiKey, setApiKey] = React.useState('');
+  const [modelName, setModelName] = React.useState<string>('');
   const [isKeyVisible, setIsKeyVisible] = React.useState(false);
   const maskedKey = apiKey ? '•'.repeat(Math.min(apiKey.length, 24)) : '';
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
@@ -192,6 +195,14 @@ export const FileMenu: React.FC = () => {
     setFileError('');
   }, []);
 
+ const handleImportOWLToCurrentProject = React.useCallback(() => {
+  console.log('🦉 OWL import clicked'); // Add this for debugging
+  setImportModalType('owl');
+  setModelName('');
+  setSelectedFile(null);
+  setFileError('');
+}, []);
+
 
   // File input change handler (PNG/JPEG only)
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -231,6 +242,35 @@ export const FileMenu: React.FC = () => {
     }
   };
 
+  
+// OWL File input change handler (.owl, .rdf, .ttl, .n3, .nt only)
+const handleOWLFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0] || null;
+  if (file) {
+    const allowedTypes = [
+      'application/rdf+xml',
+      'application/owl+xml',
+      'text/turtle',
+      'application/x-turtle',
+      'text/n3',
+      'application/n-triples'
+    ];
+    const allowedExtensions = ['.owl', '.rdf', '.ttl', '.n3', '.nt'];
+    const fileExtension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+    
+    if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
+      setFileError('Only OWL, RDF, TTL, N3, or NT files are allowed.');
+      setSelectedFile(null);
+    } else {
+      setFileError('');
+      setSelectedFile(file);
+    }
+  } else {
+    setFileError('');
+    setSelectedFile(null);
+  }
+};
+
   // Handler for Import button in modal
   const handleImportDiagramPictureFromImage = async () => {
     if (!selectedFile || !apiKey || fileError) return;
@@ -262,6 +302,26 @@ export const FileMenu: React.FC = () => {
     } catch (error) {
       // Error is already handled in the hook with toast
       console.error('KG Import failed:', error);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // Update the handleImportDiagramFromKG function to:
+  const handleImportDiagramFromOWL = async () => {
+    if (!selectedFile || fileError) return;
+    setIsImporting(true);
+    try {
+      const result = await importDiagramFromOWL(selectedFile, modelName);
+      toast.success(result.message);
+      toast.info(`Imported diagram type: ${result.diagramType}`);
+      setImportModalType(null);
+      // Clear the form
+      setApiKey('');
+      setSelectedFile(null);
+    } catch (error) {
+      // Error is already handled in the hook with toast
+      console.error('OWL Import failed:', error);
     } finally {
       setIsImporting(false);
     }
@@ -311,6 +371,12 @@ export const FileMenu: React.FC = () => {
               title="Import and convert a Knowledge Graph (KG) into a class diagram and add it to the current project"
             >
               KG to Project
+            </Dropdown.Item>
+            <Dropdown.Item
+              onClick={handleImportOWLToCurrentProject}
+              title="Import and convert an Ontology (OWL/RDF) into a class diagram and add it to the current project"
+            >
+              Ontology to Project
             </Dropdown.Item>
           </NavDropdown>
         )}
@@ -458,6 +524,78 @@ export const FileMenu: React.FC = () => {
               className="btn btn-primary"
               disabled={!apiKey || !selectedFile || !!fileError || isImporting}
               onClick={handleImportDiagramFromKG}
+            >
+              {isImporting ? 'Importing...' : 'Import'}
+            </button>
+          </Modal.Footer>
+        </Modal>
+      )}
+      {/* Import from OWL Modal */}
+      {importModalType === 'owl' && (
+        <Modal show onHide={() => setImportModalType(null)}>
+          <Modal.Header closeButton>
+            <Modal.Title>Import Class Diagram from OWL Ontology</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {isImporting ? (
+              <div className="d-flex justify-content-center align-items-center" style={{ minHeight: 80 }}>
+                <Spinner animation="border" role="status" aria-label="Importing..." />
+              </div>
+            ) : (
+              <>
+                <p className="mb-3 text-muted">
+                  Directly convert your OWL ontology to a BUML class diagram. This method uses deterministic parsing 
+                  without requiring an API key or LLM.
+                </p>
+                <form>
+                  <div className="mb-3">
+                    <label htmlFor="model-name-input" className="form-label">
+                      Model Name <span className="text-muted">(optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="model-name-input"
+                      value={modelName}
+                      onChange={e => setModelName(e.target.value)}
+                      placeholder="Auto-generated from filename"
+                      autoComplete="off"
+                    />
+                    <small className="text-muted">
+                      Leave empty to use the filename as the model name
+                    </small>
+                  </div>
+                  <div className="mb-3">
+                    <label htmlFor="diagram-owl-file" className="form-label">
+                      Upload OWL Ontology (.owl, .rdf, .ttl, .n3, .nt)
+                    </label>
+                    <input
+                      type="file"
+                      className="form-control"
+                      id="diagram-owl-file"
+                      accept=".owl,.rdf,.ttl,.n3,.nt"
+                      onChange={handleOWLFileChange}
+                    />
+                    {fileError && <div className="text-danger mt-1">{fileError}</div>}
+                    {selectedFile && (
+                      <div className="mt-2">
+                        <span className="badge bg-success me-2">✓</span>
+                        Selected file: <strong>{selectedFile.name}</strong>
+                      </div>
+                    )}
+                  </div>
+                </form>
+              </>
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            <button className="btn btn-secondary" onClick={() => setImportModalType(null)} disabled={isImporting}>
+              Cancel
+            </button>
+            <button
+              className="btn btn-primary"
+              disabled={!selectedFile || !!fileError || isImporting}
+              onClick={handleImportDiagramFromOWL}
             >
               {isImporting ? 'Importing...' : 'Import'}
             </button>
