@@ -1054,7 +1054,7 @@ function buildPageComponents(
           {
             tagName: 'div',
             type: 'text',
-            components: [{ type: 'textnode', content: '© 2025 BESSER. All rights reserved.' }],
+            components: [{ type: 'textnode', content: '© 2026 BESSER. All rights reserved.' }],
             style: {
               'margin-top': 'auto',
               'padding-top': '20px',
