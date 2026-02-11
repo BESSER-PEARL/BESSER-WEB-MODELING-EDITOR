@@ -1,0 +1,210 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { settingsService } from '@besser/wme';
+import { toast } from 'react-toastify';
+import { Download } from 'lucide-react';
+import { useProject } from '../../hooks/useProject';
+import { SupportedDiagramType } from '../../types/project';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+
+const colorByType: Record<SupportedDiagramType, string> = {
+  ClassDiagram: 'bg-sky-100 text-sky-900',
+  ObjectDiagram: 'bg-emerald-100 text-emerald-900',
+  StateMachineDiagram: 'bg-amber-100 text-amber-900',
+  AgentDiagram: 'bg-fuchsia-100 text-fuchsia-900',
+  GUINoCodeDiagram: 'bg-indigo-100 text-indigo-900',
+  QuantumCircuitDiagram: 'bg-violet-100 text-violet-900',
+};
+
+export const ProjectSettingsPanel: React.FC = () => {
+  const [isExporting, setIsExporting] = useState(false);
+  const [showInstancedObjects, setShowInstancedObjects] = useState(false);
+  const [showAssociationNames, setShowAssociationNames] = useState(false);
+
+  const { currentProject, loading, error, updateProject, exportProject } = useProject();
+
+  useEffect(() => {
+    setShowInstancedObjects(settingsService.shouldShowInstancedObjects());
+    setShowAssociationNames(settingsService.shouldShowAssociationNames());
+  }, []);
+
+  const diagrams = useMemo(() => {
+    if (!currentProject) return [];
+    return Object.entries(currentProject.diagrams).map(([type, diagram]) => ({
+      type: type as SupportedDiagramType,
+      diagram,
+    }));
+  }, [currentProject]);
+
+  const handleProjectField = (field: 'name' | 'description' | 'owner', value: string) => {
+    if (!currentProject) return;
+    updateProject({ [field]: value });
+  };
+
+  const handleExportProject = async () => {
+    if (!currentProject) return;
+
+    try {
+      setIsExporting(true);
+
+      const graphicalEditor = (window as any).editor;
+      if (graphicalEditor && currentProject.currentDiagramType === 'GUINoCodeDiagram') {
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('GrapesJS save timeout')), 5000);
+          graphicalEditor.store(() => {
+            clearTimeout(timeout);
+            setTimeout(resolve, 250);
+          });
+        });
+      }
+
+      await exportProject(currentProject.id, true);
+      toast.success('Project exported successfully.');
+    } catch (exportError) {
+      toast.error(`Failed to export project: ${exportError instanceof Error ? exportError.message : 'Unknown error'}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center p-8">
+        <Card className="w-full max-w-2xl">
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">Loading project...</CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-full items-center justify-center p-8">
+        <Card className="w-full max-w-2xl border-destructive/40">
+          <CardContent className="py-10 text-center text-sm text-destructive">{error}</CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!currentProject) {
+    return (
+      <div className="flex h-full items-center justify-center p-8">
+        <Card className="w-full max-w-2xl">
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">Open or create a project to edit settings.</CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full overflow-auto px-4 py-6 sm:px-8">
+      <div className="mx-auto max-w-5xl space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Project Settings</CardTitle>
+            <CardDescription>Update metadata, inspect diagrams and manage export for the active project.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="settings-name">Project Name</Label>
+                <Input id="settings-name" value={currentProject.name} onChange={(event) => handleProjectField('name', event.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="settings-owner">Owner</Label>
+                <Input id="settings-owner" value={currentProject.owner} onChange={(event) => handleProjectField('owner', event.target.value)} />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="settings-description">Description</Label>
+              <Textarea
+                id="settings-description"
+                value={currentProject.description}
+                onChange={(event) => handleProjectField('description', event.target.value)}
+                className="min-h-24"
+              />
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-muted-foreground">Diagrams</h3>
+              <div className="grid gap-3">
+                {diagrams.map(({ type, diagram }) => (
+                  <div key={type} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+                    <div>
+                      <p className="text-sm font-medium">{diagram.title}</p>
+                      <p className="text-xs text-muted-foreground">Updated {new Date(diagram.lastUpdate).toLocaleString()}</p>
+                    </div>
+                    <Badge className={colorByType[type]}>{type.replace('Diagram', '')}</Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-lg border border-border/60 p-3">
+                <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground">Created</p>
+                <p className="mt-1 text-sm font-medium">{new Date(currentProject.createdAt).toLocaleString()}</p>
+              </div>
+              <div className="rounded-lg border border-border/60 p-3">
+                <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground">Current Diagram</p>
+                <p className="mt-1 text-sm font-medium">{currentProject.currentDiagramType.replace('Diagram', '')}</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 rounded-lg border border-border/60 bg-muted/20 p-4">
+              <h3 className="text-sm font-semibold">Display Settings</h3>
+              <label className="flex items-start justify-between gap-4 text-sm">
+                <div>
+                  <p className="font-medium">Show Instanced Objects</p>
+                  <p className="text-xs text-muted-foreground">Toggle object instance visibility in diagrams.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={showInstancedObjects}
+                  onChange={(event) => {
+                    setShowInstancedObjects(event.target.checked);
+                    settingsService.updateSetting('showInstancedObjects', event.target.checked);
+                    toast.success(`Instanced objects ${event.target.checked ? 'enabled' : 'disabled'}.`);
+                  }}
+                />
+              </label>
+              <label className="flex items-start justify-between gap-4 text-sm">
+                <div>
+                  <p className="font-medium">Show Association Names</p>
+                  <p className="text-xs text-muted-foreground">Toggle association name visibility for UML class diagrams.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={showAssociationNames}
+                  onChange={(event) => {
+                    setShowAssociationNames(event.target.checked);
+                    settingsService.updateSetting('showAssociationNames', event.target.checked);
+                    toast.success(`Association names ${event.target.checked ? 'enabled' : 'disabled'}.`);
+                  }}
+                />
+              </label>
+            </div>
+
+            <div className="flex justify-end">
+              <Button onClick={handleExportProject} disabled={isExporting} className="gap-2">
+                <Download className="h-4 w-4" />
+                {isExporting ? 'Exporting...' : 'Export Project'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};

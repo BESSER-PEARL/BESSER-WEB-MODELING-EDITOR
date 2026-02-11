@@ -1,0 +1,93 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --radius: 0.85rem;
+  --background: 48 30% 97%;
+  --foreground: 214 28% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 214 28% 12%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 214 28% 12%;
+  --primary: 200 73% 22%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 156 22% 91%;
+  --secondary-foreground: 214 30% 16%;
+  --muted: 210 24% 94%;
+  --muted-foreground: 215 15% 40%;
+  --accent: 180 33% 91%;
+  --accent-foreground: 215 28% 17%;
+  --destructive: 7 72% 52%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 210 20% 84%;
+  --input: 210 25% 88%;
+  --ring: 199 88% 35%;
+  --app-shell-topbar-height: 64px;
+
+  --quantum-editor-bg: #ffffff;
+  --quantum-editor-surface: #f8fafc;
+  --quantum-editor-muted-surface: #f1f5f9;
+  --quantum-editor-border: #d5dde8;
+  --quantum-editor-text: #0f172a;
+  --quantum-editor-muted-text: #64748b;
+  --quantum-editor-wire: #1f2937;
+  --quantum-editor-hover: rgba(56, 189, 248, 0.16);
+  --quantum-editor-primary: #0284c7;
+  --quantum-editor-primary-soft: rgba(2, 132, 199, 0.16);
+  --quantum-editor-tooltip-shadow: 0 12px 28px rgba(2, 6, 23, 0.18);
+}
+
+[data-theme='dark'] {
+  --quantum-editor-bg: #0f172a;
+  --quantum-editor-surface: #1e293b;
+  --quantum-editor-muted-surface: #334155;
+  --quantum-editor-border: #475569;
+  --quantum-editor-text: #e2e8f0;
+  --quantum-editor-muted-text: #94a3b8;
+  --quantum-editor-wire: #cbd5e1;
+  --quantum-editor-hover: rgba(56, 189, 248, 0.24);
+  --quantum-editor-primary: #38bdf8;
+  --quantum-editor-primary-soft: rgba(56, 189, 248, 0.2);
+  --quantum-editor-tooltip-shadow: 0 14px 30px rgba(2, 6, 23, 0.45);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: 'Sora', 'Plus Jakarta Sans', sans-serif;
+  color: hsl(var(--foreground));
+  background:
+    radial-gradient(140% 110% at 0% 0%, #d7eee4 0%, #f6f7f1 48%, #f7fbff 100%),
+    linear-gradient(140deg, #f9fafb 0%, #f6f9ff 100%);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+#gjs {
+  min-height: calc(100vh - var(--app-shell-topbar-height));
+}
+
+.Toastify__toast-container {
+  width: min(420px, 90vw);
+}
+
+.Toastify__toast {
+  border-radius: 12px;
+}
