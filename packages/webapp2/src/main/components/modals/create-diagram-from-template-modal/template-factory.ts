@@ -9,9 +9,6 @@ import libraryCompleteModel from '../../../templates/pattern/structural/Library_
 import teamOclModel from '../../../templates/pattern/structural/team_player_ocl.json';
 import dppModel from '../../../templates/pattern/structural/dpp.json';
 import aiSandboxModel from '../../../templates/pattern/structural/ai_sandbox.json';
-import commandModel from '../../../templates/pattern/behavioral/command.json';
-import factoryModel from '../../../templates/pattern/creational/factory.json';
-import observerModel from '../../../templates/pattern/behavioral/observer.json';
 import greetingagent from '../../../templates/pattern/agent/greetingagent.json';
 import traficlightModel from '../../../templates/pattern/statemachine/traficlight.json';
 import { EXAMPLE_CIRCUITS } from '../../../components/quantum-editor-component/exampleCircuits';
@@ -66,27 +63,6 @@ export class TemplateFactory {
           UMLDiagramType.ClassDiagram,
           aiSandboxModel as any,
           SoftwarePatternCategory.STRUCTURAL,
-        );
-      case SoftwarePatternType.COMMAND:
-        return new SoftwarePatternTemplate(
-          softwarePatternType,
-          UMLDiagramType.ClassDiagram,
-          commandModel as any,
-          SoftwarePatternCategory.BEHAVIORAL,
-        );
-      case SoftwarePatternType.FACTORY:
-        return new SoftwarePatternTemplate(
-          softwarePatternType,
-          UMLDiagramType.ClassDiagram,
-          factoryModel as any,
-          SoftwarePatternCategory.CREATIONAL,
-        );
-      case SoftwarePatternType.OBSERVER:
-        return new SoftwarePatternTemplate(
-          softwarePatternType,
-          UMLDiagramType.ClassDiagram,
-          observerModel as any,
-          SoftwarePatternCategory.BEHAVIORAL,
         );
         case SoftwarePatternType.GREET_AGENT:
         return new SoftwarePatternTemplate(

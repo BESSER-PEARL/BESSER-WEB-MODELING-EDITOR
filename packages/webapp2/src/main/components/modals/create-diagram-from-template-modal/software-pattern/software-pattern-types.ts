@@ -17,11 +17,6 @@ export enum SoftwarePatternType {
   TEAMOCL = 'Team Player with OCL',
   DPP = 'Digital Product Passport ',
   AISANDBOX = 'AI Sandbox',
-  // Behavioral pattern
-  COMMAND = 'Command',
-  OBSERVER = 'Observer',
-  // Creational patterns
-  FACTORY = 'Factory',
   // Agent patterns
   GREET_AGENT = 'Greeting Agent',
   // State Machine patterns

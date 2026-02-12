@@ -24,6 +24,7 @@ import { buildExportableProjectPayload } from '../../services/export/projectExpo
 import { useProjectBumlPreview } from '../../services/export/useProjectBumlPreview';
 import { appVersion, besserLibraryRepositoryLink, besserLibraryVersion, besserWMERepositoryLink } from '../../application-constants';
 import { normalizeProjectName } from '../../utils/projectName';
+import { getWorkspaceContext } from '../../utils/workspaceContext';
 import { JsonViewerModal } from '../modals/json-viewer-modal/json-viewer-modal';
 import { FeedbackDialog } from '../modals/FeedbackDialog';
 import { HelpGuideDialog } from '../modals/HelpGuideDialog';
@@ -137,10 +138,10 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
   }, [diagram?.id, diagram?.title]);
 
   const activeUmlType = useMemo(() => toUMLDiagramType(currentDiagramType), [currentDiagramType]);
-  const isGuiContext =
-    location.pathname === '/graphical-ui-editor' || currentProject?.currentDiagramType === 'GUINoCodeDiagram';
-  const isClassContext = location.pathname === '/' && currentProject?.currentDiagramType === 'ClassDiagram';
-  const isDeploymentAvailable = isGuiContext || isClassContext;
+  const { isGuiContext, isDeploymentAvailable } = getWorkspaceContext(
+    location.pathname,
+    currentProject?.currentDiagramType,
+  );
   const shellBackgroundClass = isDarkTheme
     ? 'bg-[radial-gradient(120%_120%_at_0%_0%,#0f172a_0%,#111827_45%,#0b1220_100%)] text-slate-100'
     : 'bg-[radial-gradient(120%_120%_at_0%_0%,#d2e7df_0%,#f8f7f2_45%,#f7fafc_100%)] text-foreground';

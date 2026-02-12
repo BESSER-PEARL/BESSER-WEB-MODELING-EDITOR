@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { PostHogProvider } from 'posthog-js/react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -8,9 +8,7 @@ import { ApollonEditor } from '@besser/wme';
 import {
   POSTHOG_HOST,
   POSTHOG_KEY,
-  localStorageLatestProject,
   BACKEND_URL,
-  APPLICATION_SERVER_VERSION,
 } from './constant';
 import { ApollonEditorProvider } from './components/apollon-editor-component/apollon-editor-context';
 import { ApollonEditorComponent } from './components/apollon-editor-component/ApollonEditorComponent';
@@ -31,8 +29,7 @@ import {
   QiskitConfig,
 } from './services/generate-code/useGenerateCode';
 import { useDeployLocally } from './services/generate-code/useDeployLocally';
-import { useGitHubBumlImport } from './services/import/useGitHubBumlImport';
-import { WorkspaceShell, GeneratorType, GeneratorMenuMode } from './components/sidebar/WorkspaceShell';
+import { WorkspaceShell, GeneratorType } from './components/sidebar/WorkspaceShell';
 import { ProjectHubDialog } from './components/home/ProjectHubDialog';
 import { ProjectSettingsPanel } from './components/project/ProjectSettingsPanel';
 import { TemplateLibraryDialog } from './components/modals/TemplateLibraryDialog';
@@ -41,6 +38,8 @@ import { GeneratorConfigDialogs } from './components/modals/generator-config/Gen
 import { GrapesJSProjectData, isUMLModel } from './types/project';
 import { validateDiagram } from './services/validation/validateDiagram';
 import { ConfigDialog, getConfigDialogForGenerator } from './services/generate-code/generator-dialog-config';
+import { useProjectBootstrap } from './hooks/useProjectBootstrap';
+import { getWorkspaceContext } from './utils/workspaceContext';
 
 const postHogOptions = {
   api_host: POSTHOG_HOST,
@@ -51,8 +50,6 @@ const postHogOptions = {
   persistence: (hasUserConsented() ? 'localStorage+cookie' : 'memory') as 'localStorage+cookie' | 'memory',
   ip: false,
 };
-
-const knownRoutes = ['/', '/project-settings', '/graphical-ui-editor', '/quantum-editor'];
 
 const toIdentifier = (value: string, fallback: string): string => {
   const normalized = value
@@ -96,10 +93,8 @@ function isGuiModelEmpty(guiModel: GrapesJSProjectData | undefined): boolean {
 
 function AppContentInner() {
   const [editor, setEditor] = useState<ApollonEditor>();
-  const [showProjectHub, setShowProjectHub] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
-  const [hasCheckedForProject, setHasCheckedForProject] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [configDialog, setConfigDialog] = useState<ConfigDialog>('none');
 
@@ -116,91 +111,25 @@ function AppContentInner() {
   const [qiskitShots, setQiskitShots] = useState<number>(1024);
 
   const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
 
   const { currentProject, loadProject } = useProject();
   const generateCode = useGenerateCode();
   const deployLocally = useDeployLocally();
-  const { importFromGitHub, isLoading: isGitHubImportLoading } = useGitHubBumlImport();
-
-  const hasTokenInUrl = !knownRoutes.includes(location.pathname);
-  const isQuantumContext =
-    location.pathname === '/quantum-editor' || currentProject?.currentDiagramType === 'QuantumCircuitDiagram';
-  const isGuiContext =
-    location.pathname === '/graphical-ui-editor' || currentProject?.currentDiagramType === 'GUINoCodeDiagram';
-  const isClassContext = location.pathname === '/' && currentProject?.currentDiagramType === 'ClassDiagram';
-  const isAgentContext = location.pathname === '/' && currentProject?.currentDiagramType === 'AgentDiagram';
-
-  const generatorMenuMode: GeneratorMenuMode = isQuantumContext
-    ? 'quantum'
-    : isGuiContext
-      ? 'gui'
-      : isAgentContext
-        ? 'agent'
-        : isClassContext
-          ? 'class'
-          : 'none';
+  const { showProjectHub, setShowProjectHub } = useProjectBootstrap({
+    currentProject,
+    loadProject,
+    pathname: location.pathname,
+  });
+  const { isQuantumContext, isGuiContext, generatorMenuMode } = getWorkspaceContext(
+    location.pathname,
+    currentProject?.currentDiagramType,
+  );
 
   const isLocalEnvironment =
     !BACKEND_URL || BACKEND_URL.includes('localhost') || BACKEND_URL.includes('127.0.0.1');
 
   const activeDiagram = currentProject ? currentProject.diagrams[currentProject.currentDiagramType] : undefined;
   const activeDiagramTitle = activeDiagram?.title || currentProject?.name || 'Diagram';
-
-  useEffect(() => {
-    const checkForLatestProject = async () => {
-      if (hasCheckedForProject) {
-        return;
-      }
-
-      if (hasTokenInUrl) {
-        setShowProjectHub(false);
-        setHasCheckedForProject(true);
-        return;
-      }
-
-      const latestProjectId = localStorage.getItem(localStorageLatestProject);
-
-      if (latestProjectId) {
-        try {
-          await loadProject(latestProjectId);
-          setShowProjectHub(false);
-        } catch {
-          setShowProjectHub(true);
-        }
-      } else {
-        setShowProjectHub(true);
-      }
-
-      setHasCheckedForProject(true);
-    };
-
-    checkForLatestProject();
-  }, [loadProject, hasCheckedForProject, hasTokenInUrl]);
-
-  useEffect(() => {
-    const bumlUrl = searchParams.get('buml');
-
-    if (bumlUrl && !isGitHubImportLoading) {
-      importFromGitHub(bumlUrl).then(() => {
-        searchParams.delete('buml');
-        setSearchParams(searchParams, { replace: true });
-      });
-    }
-  }, [searchParams, setSearchParams, importFromGitHub, isGitHubImportLoading]);
-
-  useEffect(() => {
-    if (!hasCheckedForProject) {
-      return;
-    }
-
-    if (hasTokenInUrl) {
-      setShowProjectHub(false);
-      return;
-    }
-
-    setShowProjectHub(!currentProject);
-  }, [currentProject, hasCheckedForProject, hasTokenInUrl]);
 
   useEffect(() => {
     if (!currentProject) {
