@@ -5,6 +5,7 @@
 @tailwind utilities;
 
 :root {
+  --font-geist-sans: 'Sora';
   --radius: 0.85rem;
   --background: 48 30% 97%;
   --foreground: 214 28% 12%;
@@ -66,7 +67,15 @@ body,
 }
 
 body {
-  font-family: 'Sora', 'Plus Jakarta Sans', sans-serif;
+  font-family:
+    var(--font-geist-sans),
+    ui-sans-serif,
+    system-ui,
+    sans-serif,
+    'Apple Color Emoji',
+    'Segoe UI Emoji',
+    'Segoe UI Symbol',
+    'Noto Color Emoji';
   color: hsl(var(--foreground));
   background:
     radial-gradient(140% 110% at 0% 0%, #d7eee4 0%, #f6f7f1 48%, #f7fbff 100%),
