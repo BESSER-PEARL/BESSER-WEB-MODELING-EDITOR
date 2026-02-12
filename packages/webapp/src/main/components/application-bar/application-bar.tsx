@@ -195,6 +195,15 @@ export const ApplicationBar: React.FC<{ onOpenHome?: () => void }> = ({ onOpenHo
   };
 
   const handleQualityCheck = async () => {
+    if (
+      location.pathname === '/quantum-editor' ||
+      location.pathname === '/graphical-ui-editor' ||
+      currentProject?.currentDiagramType === 'QuantumCircuitDiagram'
+    ) {
+      toast.error('coming soon');
+      return;
+    }
+
     // For quantum circuits, diagram.model contains the circuit data
     // For UML diagrams, editor.model contains the model data
     if (diagram?.model && !isUMLModel(diagram.model)) {

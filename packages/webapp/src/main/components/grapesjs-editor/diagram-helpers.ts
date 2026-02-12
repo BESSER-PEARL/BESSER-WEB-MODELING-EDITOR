@@ -451,26 +451,45 @@ export function getTableOptions(editor: any): { value: string; label: string }[]
     
     if (!pageWrapper) return options;
     
-    // Find all table components in the current page only
-    const tables = pageWrapper.find('[class*="table-component"]');
-    
-    if (!tables) return options;
-    
-    tables.forEach((table: any) => {
+    // Find all table components in the current page using both class selector and type check.
+    // The class selector works for manually dropped tables; the type-based walk
+    // catches auto-generated tables whose class may not survive serialization.
+    const tablesByClass = pageWrapper.find('.table-component') || [];
+    const seenIds = new Set<string>();
+
+    const processTable = (table: any) => {
       try {
         const attrs = table.getAttributes();
-        const title = attrs['chart-title'] || 'Untitled Table';
-        // Use the id attribute instead of component ID
+        const title = attrs['chart-title'] || table.get('chart-title') || 'Untitled Table';
         const tableId = attrs['id'] || table.getId();
-        
+        if (seenIds.has(tableId)) return;
+        seenIds.add(tableId);
+
         options.push({
-          value: tableId,  // Store the table's id attribute as the value
-          label: `${title} (table)`  // Display the title with "(table)" suffix
+          value: tableId,
+          label: `${title} (table)`,
         });
       } catch (err) {
         console.warn('[getTableOptions] Error processing table:', err);
       }
-    });
+    };
+
+    // 1. Tables found by CSS class
+    tablesByClass.forEach(processTable);
+
+    // 2. Walk the component tree to find tables by GrapesJS component type
+    const walkComponents = (parent: any) => {
+      const children = parent.components?.() || parent.get?.('components');
+      if (!children) return;
+      children.forEach((child: any) => {
+        if (child.get('type') === 'table') {
+          processTable(child);
+        }
+        walkComponents(child);
+      });
+    };
+    walkComponents(pageWrapper);
+
   } catch (err) {
     console.warn('[getTableOptions] Error getting page wrapper:', err);
   }
