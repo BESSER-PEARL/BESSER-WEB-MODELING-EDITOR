@@ -17,7 +17,7 @@ import { QuantumEditorComponent } from './components/quantum-editor-component/Qu
 import { ErrorPanel } from './components/error-handling/error-panel';
 import { UMLAgentModeling } from './components/uml-agent-widget/UMLAgentModeling';
 import { CookieConsentBanner, hasUserConsented } from './components/cookie-consent/CookieConsentBanner';
-import { ApplicationStore } from './components/store/application-store';
+import { ApplicationStore } from './store/application-store';
 import { useProject } from './hooks/useProject';
 import {
   useGenerateCode,

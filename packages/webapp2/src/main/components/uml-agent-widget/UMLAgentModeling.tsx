@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import styled from 'styled-components';
 import { ApollonEditorContext } from '../apollon-editor-component/apollon-editor-context';
-import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { useLocation } from 'react-router-dom';
 import { UMLModelingService, ClassSpec, SystemSpec, ModelModification, BESSERModel, ModelUpdate } from './services/UMLModelingService';
 import { WebSocketService, ChatMessage, InjectionCommand, SendStatus } from './services/WebSocketService';

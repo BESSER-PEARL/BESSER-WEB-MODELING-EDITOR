@@ -2,7 +2,7 @@ import { UMLDiagramType, UMLModel } from '@besser/wme';
 import { BesserProject } from '../types/project';
 import { ProjectStorageRepository } from '../services/storage/ProjectStorageRepository';
 import { useCallback } from 'react';
-import { useAppDispatch, useAppSelector } from '../components/store/hooks';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { normalizeProjectName } from '../utils/projectName';
 import {
   loadProjectThunk,

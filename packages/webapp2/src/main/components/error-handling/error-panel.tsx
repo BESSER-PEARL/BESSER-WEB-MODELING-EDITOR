@@ -1,7 +1,7 @@
 import React from 'react';
 
 import { ErrorMessage } from './error-message';
-import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { dismissError } from '../../services/error-management/errorManagementSlice';
 
 export const ErrorPanel: React.FC = () => {

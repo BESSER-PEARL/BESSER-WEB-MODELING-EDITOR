@@ -4,7 +4,7 @@ import { UMLDiagramType } from '@besser/wme';
 import { toast } from 'react-toastify';
 import { useProject } from '../../hooks/useProject';
 import { toUMLDiagramType } from '../../types/project';
-import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { updateDiagramThunk } from '../../services/diagram/diagramSlice';
 import { useGitHubAuth } from '../../services/github/useGitHubAuth';
 import { GitHubSidebar } from '../github-sidebar';

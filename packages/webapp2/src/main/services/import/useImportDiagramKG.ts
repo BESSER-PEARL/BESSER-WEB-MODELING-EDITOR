@@ -2,7 +2,7 @@
 import { toast } from 'react-toastify';
 import { useCallback } from 'react';
 import { BACKEND_URL } from '../../constant';
-import { useAppDispatch } from '../../components/store/hooks';
+import { useAppDispatch } from '../../store/hooks';
 import { uuid } from '../../utils/uuid';
 import { loadImportedDiagram } from '../diagram/diagramSlice';
 import { displayError } from '../error-management/errorManagementSlice';

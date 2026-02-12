@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAppDispatch } from '../store/hooks';
+import { useAppDispatch } from '../../store/hooks';
 import { setCreateNewEditor, updateDiagram } from '../../services/diagram/diagramSlice';
 import {
   switchDiagramTypeThunk,

@@ -4,7 +4,7 @@ import styled from 'styled-components';
 
 import { setCreateNewEditor, updateDiagramThunk, selectCreatenewEditor } from '../../services/diagram/diagramSlice';
 import { ApollonEditorContext } from './apollon-editor-context';
-import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { isUMLModel } from '../../types/project';
 import { selectCurrentProject } from '../../services/project/projectSlice';
 

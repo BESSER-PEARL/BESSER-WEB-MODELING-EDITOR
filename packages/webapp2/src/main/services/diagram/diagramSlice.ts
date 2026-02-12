@@ -1,7 +1,6 @@
 import { createSlice, PayloadAction, createAsyncThunk } from '@reduxjs/toolkit';
 import { ApollonMode, Locale, Styles, UMLDiagramType, UMLModel } from '@besser/wme';
 import { uuid } from '../../utils/uuid';
-import { addDiagramToCurrentProject } from '../../utils/localStorage';
 import { ProjectStorageRepository } from '../storage/ProjectStorageRepository';
 import { GrapesJSProjectData, isUMLModel, toUMLDiagramType } from '../../types/project';
 import { DeepPartial } from '../../utils/types';
@@ -178,10 +177,6 @@ const diagramSlice = createSlice({
       };
       state.editorOptions.type = action.payload.diagramType;
       state.createNewEditor = true;
-      
-      // Automatically add the new diagram to the current project if in project context
-      // This ensures all diagram creation flows (drag-drop, modals, imports) work with projects
-      addDiagramToCurrentProject(newDiagramId);
     },
     loadDiagram: (state, action: PayloadAction<Diagram>) => {
       state.diagram = action.payload;
@@ -197,9 +192,6 @@ const diagramSlice = createSlice({
       if (isUMLModel(action.payload.model)) {
         state.editorOptions.type = action.payload.model.type;
       }
-      
-      // Add imported diagram to current project if in project context
-      addDiagramToCurrentProject(action.payload.id);
     },
     setCreateNewEditor: (state, action: PayloadAction<boolean>) => {
       state.createNewEditor = action.payload;
