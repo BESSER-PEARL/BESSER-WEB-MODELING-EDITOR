@@ -17,7 +17,6 @@ export const WorkspaceTopBar: React.FC<WorkspaceTopBarProps> = ({
   diagramBadgeClass,
   outlineButtonClass,
   primaryGenerateClass,
-  githubBadgeClass,
   showQualityCheck,
   generatorMode,
   isGenerating,
@@ -131,7 +130,6 @@ export const WorkspaceTopBar: React.FC<WorkspaceTopBarProps> = ({
             showQualityCheck={showQualityCheck}
             outlineButtonClass={outlineButtonClass}
             isDarkTheme={isDarkTheme}
-            githubBadgeClass={githubBadgeClass}
             isAuthenticated={isAuthenticated}
             username={username}
             githubLoading={githubLoading}

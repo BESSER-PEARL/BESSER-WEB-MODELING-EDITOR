@@ -14,7 +14,6 @@ interface TopBarUtilitiesProps {
   showQualityCheck: boolean;
   outlineButtonClass: string;
   isDarkTheme: boolean;
-  githubBadgeClass: string;
   isAuthenticated: boolean;
   username?: string;
   githubLoading: boolean;

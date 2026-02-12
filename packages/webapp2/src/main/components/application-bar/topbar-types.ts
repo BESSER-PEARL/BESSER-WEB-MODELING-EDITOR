@@ -9,7 +9,6 @@ export interface WorkspaceTopBarProps {
   diagramBadgeClass: string;
   outlineButtonClass: string;
   primaryGenerateClass: string;
-  githubBadgeClass: string;
   showQualityCheck: boolean;
   generatorMode: GeneratorMenuMode;
   isGenerating: boolean;

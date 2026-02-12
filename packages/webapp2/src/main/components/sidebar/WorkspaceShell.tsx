@@ -160,9 +160,6 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
   const primaryGenerateClass = isDarkTheme
     ? 'gap-2 bg-sky-700 text-white hover:bg-sky-600'
     : 'gap-2 bg-slate-900 text-white hover:bg-slate-800';
-  const githubBadgeClass = isDarkTheme
-    ? 'hidden max-w-[160px] truncate bg-slate-800 px-2 py-1 text-slate-100 lg:inline-flex'
-    : 'hidden max-w-[160px] truncate bg-slate-100 px-2 py-1 text-slate-700 lg:inline-flex';
   const sidebarBaseClass = isDarkTheme
     ? 'hidden shrink-0 border-r border-slate-700/70 bg-slate-950/65 p-2.5 backdrop-blur-sm transition-all duration-200 md:flex md:flex-col md:gap-2'
     : 'hidden shrink-0 border-r border-slate-300/60 bg-white/60 p-2.5 backdrop-blur-sm transition-all duration-200 md:flex md:flex-col md:gap-2';
@@ -468,7 +465,6 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
         diagramBadgeClass={diagramBadgeClass}
         outlineButtonClass={outlineButtonClass}
         primaryGenerateClass={primaryGenerateClass}
-        githubBadgeClass={githubBadgeClass}
         showQualityCheck={showQualityCheck}
         generatorMode={generatorMode}
         isGenerating={isGenerating}
