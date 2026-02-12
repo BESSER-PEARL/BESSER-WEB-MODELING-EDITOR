@@ -6,6 +6,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -13,6 +14,8 @@ import {
 interface CommunityMenuProps {
   outlineButtonClass: string;
   onOpenFeedback: () => void;
+  onOpenHelpDialog: () => void;
+  onOpenAboutDialog: () => void;
 }
 
 const COMMUNITY_URLS = {
@@ -24,6 +27,8 @@ const COMMUNITY_URLS = {
 export const CommunityMenu: React.FC<CommunityMenuProps> = ({
   outlineButtonClass,
   onOpenFeedback,
+  onOpenHelpDialog,
+  onOpenAboutDialog,
 }) => {
   const openExternalUrl = (url: string) => {
     window.open(url, '_blank', 'noopener,noreferrer');
@@ -34,16 +39,24 @@ export const CommunityMenu: React.FC<CommunityMenuProps> = ({
       <DropdownMenuTrigger asChild>
         <Button variant="outline" className={`gap-2 ${outlineButtonClass}`}>
           <Users className="h-4 w-4" />
-          Community
+          Community & Help
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-64" align="end">
+        <DropdownMenuLabel className="text-xs uppercase tracking-wide text-muted-foreground">
+          Community
+        </DropdownMenuLabel>
         <DropdownMenuItem onClick={() => openExternalUrl(COMMUNITY_URLS.contribute)}>Contribute</DropdownMenuItem>
         <DropdownMenuItem onClick={() => openExternalUrl(COMMUNITY_URLS.repository)}>GitHub Repository</DropdownMenuItem>
-        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onOpenFeedback}>Send Feedback</DropdownMenuItem>
         <DropdownMenuItem onClick={() => openExternalUrl(COMMUNITY_URLS.survey)}>User Evaluation Survey</DropdownMenuItem>
         <DropdownMenuItem onClick={() => openExternalUrl(bugReportURL)}>Report a Problem</DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="text-xs uppercase tracking-wide text-muted-foreground">
+          Help
+        </DropdownMenuLabel>
+        <DropdownMenuItem onClick={onOpenHelpDialog}>How does this editor work?</DropdownMenuItem>
+        <DropdownMenuItem onClick={onOpenAboutDialog}>About BESSER</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
