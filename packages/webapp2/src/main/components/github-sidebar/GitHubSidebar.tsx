@@ -960,14 +960,14 @@ export const GitHubSidebar: React.FC<GitHubSidebarProps> = ({ isOpen, onClose })
       <div
         onClick={onClose}
         className={cn(
-          'fixed inset-0 top-14 z-40 bg-black/30 transition-all duration-200',
+          'absolute inset-0 z-40 bg-black/30 transition-all duration-200',
           isOpen ? 'visible opacity-100 pointer-events-auto' : 'invisible opacity-0 pointer-events-none',
         )}
       />
 
       <aside
         className={cn(
-          'fixed right-0 top-14 z-50 h-[calc(100vh-56px)] w-[380px] max-w-[96vw] border-l border-border/70 bg-background shadow-xl transition-all duration-200',
+          'absolute bottom-0 right-0 top-0 z-50 w-[380px] max-w-[96vw] border-l border-border/70 bg-background shadow-xl transition-all duration-200',
           isOpen
             ? 'visible translate-x-0 opacity-100 pointer-events-auto'
             : 'invisible translate-x-full opacity-0 pointer-events-none',

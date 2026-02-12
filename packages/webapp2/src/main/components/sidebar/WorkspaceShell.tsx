@@ -511,7 +511,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
         onDiagramRename={handleDiagramRename}
       />
 
-      <div className="flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 flex-1">
         <WorkspaceSidebar
           isDarkTheme={isDarkTheme}
           isSidebarExpanded={isSidebarExpanded}
@@ -528,9 +528,12 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
         />
 
         <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
-      </div>
 
-      <GitHubSidebar isOpen={isGitHubSidebarOpen} onClose={() => setIsGitHubSidebarOpen(false)} />
+        <GitHubSidebar
+          isOpen={isGitHubSidebarOpen}
+          onClose={() => setIsGitHubSidebarOpen(false)}
+        />
+      </div>
 
       <Dialog open={assistantImportMode !== null} onOpenChange={(open) => !open && resetAssistantImportDialog()}>
         <DialogContent className="sm:max-w-lg">
