@@ -38,11 +38,7 @@ export interface WorkspaceTopBarProps {
   onOpenDeployDialog: () => void;
   onOpenHelpDialog: () => void;
   onOpenAboutDialog: () => void;
-  onOpenContribute: () => void;
-  onOpenRepository: () => void;
   onOpenFeedback: () => void;
-  onOpenSurvey: () => void;
-  onOpenBugReport: () => void;
   onSwitchUml: (type: UMLDiagramType) => void;
   onNavigate: (path: string) => void;
   onProjectNameDraftChange: (value: string) => void;

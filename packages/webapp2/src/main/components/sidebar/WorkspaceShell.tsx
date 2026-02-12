@@ -6,11 +6,9 @@ import { useProject } from '../../hooks/useProject';
 import { toUMLDiagramType } from '../../types/project';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { updateDiagramThunk } from '../../services/diagram/diagramSlice';
-import { bugReportURL } from '../../constant';
 import { useGitHubAuth } from '../../services/github/useGitHubAuth';
 import { GitHubSidebar } from '../github-sidebar';
-import { toggleTheme } from '../../utils/theme-switcher';
-import { LocalStorageRepository } from '../../services/local-storage/local-storage-repository';
+import { isDarkThemeEnabled, toggleTheme } from '../../utils/theme-switcher';
 import { useDeployToGitHub } from '../../services/deploy/useGitHubDeploy';
 import { ProjectStorageRepository } from '../../services/storage/ProjectStorageRepository';
 import { useImportDiagramToProjectWorkflow } from '../../services/import/useImportDiagram';
@@ -48,21 +46,6 @@ interface WorkspaceShellProps {
   generatorMode: GeneratorMenuMode;
   isGenerating?: boolean;
 }
-
-const COMMUNITY_URLS = {
-  contribute: 'https://github.com/BESSER-PEARL/BESSER/blob/master/CONTRIBUTING.md',
-  repository: 'https://github.com/BESSER-PEARL/BESSER',
-  survey: 'https://docs.google.com/forms/d/e/1FAIpQLSdhYVFFu8xiFkoV4u6Pgjf5F7-IS_W7aTj34N5YS2L143vxoQ/viewform',
-  feedback: 'https://github.com/BESSER-PEARL/BESSER/discussions',
-};
-
-const DOCS_URL = 'https://besser.readthedocs.io/en/latest/';
-
-const getIsDarkTheme = (): boolean => {
-  const preferred = LocalStorageRepository.getUserThemePreference();
-  const fallback = LocalStorageRepository.getSystemThemePreference();
-  return (preferred || fallback || 'light') === 'dark';
-};
 
 const sanitizeRepoName = (name: string): string => {
   return name
@@ -106,7 +89,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [projectNameDraft, setProjectNameDraft] = useState(currentProject?.name ?? '');
   const [diagramTitleDraft, setDiagramTitleDraft] = useState(diagram?.title ?? '');
-  const [isDarkTheme, setIsDarkTheme] = useState<boolean>(() => getIsDarkTheme());
+  const [isDarkTheme, setIsDarkTheme] = useState<boolean>(() => isDarkThemeEnabled());
   const [isGitHubSidebarOpen, setIsGitHubSidebarOpen] = useState(false);
 
   const [assistantImportMode, setAssistantImportMode] = useState<AssistantImportMode>(null);
@@ -206,7 +189,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
 
   const handleToggleTheme = () => {
     toggleTheme();
-    setIsDarkTheme(getIsDarkTheme());
+    setIsDarkTheme(isDarkThemeEnabled());
   };
 
   const openExternalUrl = (url: string) => {
@@ -497,11 +480,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
         onOpenDeployDialog={handleOpenDeployDialog}
         onOpenHelpDialog={() => setIsHelpDialogOpen(true)}
         onOpenAboutDialog={() => setIsAboutDialogOpen(true)}
-        onOpenContribute={() => openExternalUrl(COMMUNITY_URLS.contribute)}
-        onOpenRepository={() => openExternalUrl(COMMUNITY_URLS.repository)}
         onOpenFeedback={() => setIsFeedbackDialogOpen(true)}
-        onOpenSurvey={() => openExternalUrl(COMMUNITY_URLS.survey)}
-        onOpenBugReport={() => openExternalUrl(bugReportURL)}
         onSwitchUml={handleSwitchUml}
         onNavigate={navigate}
         onProjectNameDraftChange={setProjectNameDraft}
@@ -573,8 +552,6 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
       <HelpGuideDialog
         open={isHelpDialogOpen}
         onOpenChange={setIsHelpDialogOpen}
-        onOpenDocs={() => openExternalUrl(DOCS_URL)}
-        onOpenRepository={() => openExternalUrl(besserWMERepositoryLink)}
       />
 
       <DeployDialog

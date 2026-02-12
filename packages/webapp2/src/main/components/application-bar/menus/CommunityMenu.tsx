@@ -1,6 +1,7 @@
 import React from 'react';
 import { Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { bugReportURL } from '../../../constant';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,21 +12,23 @@ import {
 
 interface CommunityMenuProps {
   outlineButtonClass: string;
-  onOpenContribute: () => void;
-  onOpenRepository: () => void;
   onOpenFeedback: () => void;
-  onOpenSurvey: () => void;
-  onOpenBugReport: () => void;
 }
+
+const COMMUNITY_URLS = {
+  contribute: 'https://github.com/BESSER-PEARL/BESSER/blob/master/CONTRIBUTING.md',
+  repository: 'https://github.com/BESSER-PEARL/BESSER',
+  survey: 'https://docs.google.com/forms/d/e/1FAIpQLSdhYVFFu8xiFkoV4u6Pgjf5F7-IS_W7aTj34N5YS2L143vxoQ/viewform',
+};
 
 export const CommunityMenu: React.FC<CommunityMenuProps> = ({
   outlineButtonClass,
-  onOpenContribute,
-  onOpenRepository,
   onOpenFeedback,
-  onOpenSurvey,
-  onOpenBugReport,
 }) => {
+  const openExternalUrl = (url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -35,12 +38,12 @@ export const CommunityMenu: React.FC<CommunityMenuProps> = ({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-64" align="end">
-        <DropdownMenuItem onClick={onOpenContribute}>Contribute</DropdownMenuItem>
-        <DropdownMenuItem onClick={onOpenRepository}>GitHub Repository</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => openExternalUrl(COMMUNITY_URLS.contribute)}>Contribute</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => openExternalUrl(COMMUNITY_URLS.repository)}>GitHub Repository</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onOpenFeedback}>Send Feedback</DropdownMenuItem>
-        <DropdownMenuItem onClick={onOpenSurvey}>User Evaluation Survey</DropdownMenuItem>
-        <DropdownMenuItem onClick={onOpenBugReport}>Report a Problem</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => openExternalUrl(COMMUNITY_URLS.survey)}>User Evaluation Survey</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => openExternalUrl(bugReportURL)}>Report a Problem</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

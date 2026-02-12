@@ -3,6 +3,7 @@ import { BookOpen, ExternalLink, Layers } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { besserWMERepositoryLink } from '../../application-constants';
 
 type GuideSectionId = 'class' | 'object' | 'state' | 'agent' | 'gui' | 'quantum';
 
@@ -26,11 +27,10 @@ interface GuideSection {
 interface HelpGuideDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onOpenDocs: () => void;
-  onOpenRepository: () => void;
 }
 
 const sharedLinkClass = 'font-medium text-primary underline-offset-4 hover:underline';
+const DOCS_URL = 'https://besser.readthedocs.io/en/latest/';
 
 const sections: GuideSection[] = [
   {
@@ -441,13 +441,12 @@ const sections: GuideSection[] = [
   },
 ];
 
-export const HelpGuideDialog: React.FC<HelpGuideDialogProps> = ({
-  open,
-  onOpenChange,
-  onOpenDocs,
-  onOpenRepository,
-}) => {
+export const HelpGuideDialog: React.FC<HelpGuideDialogProps> = ({ open, onOpenChange }) => {
   const [activeSection, setActiveSection] = useState<GuideSectionId>('class');
+
+  const openExternalUrl = (url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
 
   useEffect(() => {
     if (open) {
@@ -536,11 +535,11 @@ export const HelpGuideDialog: React.FC<HelpGuideDialogProps> = ({
         </div>
 
         <DialogFooter className="border-t border-border/70 px-6 py-4">
-          <Button variant="outline" onClick={onOpenDocs} className="gap-2">
+          <Button variant="outline" onClick={() => openExternalUrl(DOCS_URL)} className="gap-2">
             Open BESSER Docs
             <ExternalLink className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="outline" onClick={onOpenRepository} className="gap-2">
+          <Button variant="outline" onClick={() => openExternalUrl(besserWMERepositoryLink)} className="gap-2">
             Open WME Repository
             <ExternalLink className="h-3.5 w-3.5" />
           </Button>

@@ -36,3 +36,9 @@ export const toggleTheme = () => {
       break;
   }
 };
+
+export const isDarkThemeEnabled = (): boolean => {
+  const preferred = LocalStorageRepository.getUserThemePreference();
+  const fallback = LocalStorageRepository.getSystemThemePreference();
+  return (preferred || fallback || 'light') === 'dark';
+};

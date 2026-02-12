@@ -46,11 +46,7 @@ export const WorkspaceTopBar: React.FC<WorkspaceTopBarProps> = ({
   onOpenDeployDialog,
   onOpenHelpDialog,
   onOpenAboutDialog,
-  onOpenContribute,
-  onOpenRepository,
   onOpenFeedback,
-  onOpenSurvey,
-  onOpenBugReport,
   onSwitchUml,
   onNavigate,
   onProjectNameDraftChange,
@@ -115,11 +111,7 @@ export const WorkspaceTopBar: React.FC<WorkspaceTopBarProps> = ({
           />
           <CommunityMenu
             outlineButtonClass={outlineButtonClass}
-            onOpenContribute={onOpenContribute}
-            onOpenRepository={onOpenRepository}
             onOpenFeedback={onOpenFeedback}
-            onOpenSurvey={onOpenSurvey}
-            onOpenBugReport={onOpenBugReport}
           />
           <HelpMenu
             outlineButtonClass={outlineButtonClass}
