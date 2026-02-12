@@ -1,377 +1,84 @@
-import React, { useState, useEffect, useCallback, useContext } from 'react';
-import styled from 'styled-components';
-import { Button, Form, Modal, Spinner, Badge, ListGroup, OverlayTrigger, Tooltip } from 'react-bootstrap';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
-  Github,
-  X,
-  CloudArrowUp,
-  CloudArrowDown,
-  ClockHistory,
-  Link45deg,
-  PlusCircle,
-  ArrowClockwise,
-  BoxArrowUpRight,
-  XCircle,
-  Check2Circle,
-  ExclamationTriangle,
-  Folder,
-  FileEarmark,
+  AlertTriangle,
   ArrowLeft,
-  Share,
-  Gear
-} from 'react-bootstrap-icons';
+  CheckCircle2,
+  CloudDownload,
+  CloudUpload,
+  ExternalLink,
+  FileText,
+  FolderOpen,
+  Github,
+  History,
+  Link2,
+  Loader2,
+  PlusCircle,
+  RefreshCw,
+  Settings,
+  Share2,
+  Unlink2,
+  X,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 import { useGitHubAuth } from '../../services/github/useGitHubAuth';
-import { useGitHubStorage, GitHubRepository, GitHubCommit, LinkedRepository, GitHubContentItem } from '../../services/github/useGitHubStorage';
+import {
+  GitHubCommit,
+  GitHubContentItem,
+  GitHubRepository,
+  useGitHubStorage,
+} from '../../services/github/useGitHubStorage';
 import { useAutoCommit } from '../../services/github/useAutoCommit';
 import { useProject } from '../../hooks/useProject';
 import { ProjectStorageRepository } from '../../services/storage/ProjectStorageRepository';
 import { toast } from 'react-toastify';
 import { FileBrowserModal } from './FileBrowserModal';
 import { ApollonEditorContext } from '../apollon-editor-component/apollon-editor-context';
-import { useAppSelector } from '../store/hooks';
-
-// Styled Components - Integrated panel style
-const SidebarOverlay = styled.div<{ $isOpen: boolean }>`
-  position: fixed;
-  top: 56px;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.3);
-  opacity: ${props => props.$isOpen ? 1 : 0};
-  visibility: ${props => props.$isOpen ? 'visible' : 'hidden'};
-  transition: all 0.25s ease;
-  z-index: 1000;
-`;
-
-const SidebarContainer = styled.div<{ $isOpen: boolean }>`
-  position: fixed;
-  top: 56px;
-  right: 0;
-  width: 360px;
-  max-width: 100vw;
-  height: calc(100vh - 56px);
-  background: var(--apollon-background, #ffffff);
-  border-left: 1px solid var(--apollon-border, #dee2e6);
-  transform: translateX(${props => props.$isOpen ? '0' : '100%'});
-  transition: transform 0.25s ease;
-  z-index: 1001;
-  display: flex;
-  flex-direction: column;
-  
-  .dark-mode & {
-    background: #1e2228;
-    border-color: #3d4449;
-  }
-`;
-
-const SidebarHeader = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--apollon-border, #dee2e6);
-  background: var(--apollon-background, #ffffff);
-  
-  .dark-mode & {
-    background: #23272b;
-    border-color: #3d4449;
-  }
-  
-  h5 {
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: 600;
-    font-size: 0.95rem;
-    color: var(--apollon-text, #212529);
-    
-    .dark-mode & {
-      color: #e9ecef;
-    }
-  }
-`;
-
-const CloseButton = styled.button`
-  background: transparent;
-  border: none;
-  color: var(--apollon-text-secondary, #6c757d);
-  padding: 4px;
-  cursor: pointer;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  
-  &:hover {
-    background: var(--apollon-background-hover, #f8f9fa);
-    color: var(--apollon-text, #212529);
-  }
-  
-  .dark-mode &:hover {
-    background: #3d4449;
-    color: #e9ecef;
-  }
-`;
-
-const SidebarContent = styled.div`
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-`;
-
-const Section = styled.div`
-  margin-bottom: 20px;
-`;
-
-const SectionTitle = styled.h6`
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--apollon-text-secondary, #6c757d);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 10px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-`;
-
-const LinkedRepoCard = styled.div`
-  background: var(--apollon-background-secondary, #f8f9fa);
-  border: 1px solid var(--apollon-border, #dee2e6);
-  border-radius: 8px;
-  padding: 14px;
-  
-  .dark-mode & {
-    background: #2d3238;
-    border-color: #3d4449;
-  }
-`;
-
-const RepoInfo = styled.div`
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-bottom: 10px;
-  
-  .repo-icon {
-    background: #24292e;
-    color: #fff;
-    width: 36px;
-    height: 36px;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-  
-  .repo-details {
-    flex: 1;
-    min-width: 0;
-    
-    .repo-name {
-      font-weight: 600;
-      font-size: 0.9rem;
-      color: var(--apollon-text, #212529);
-      word-break: break-word;
-      
-      .dark-mode & {
-        color: #e9ecef;
-      }
-    }
-    
-    .repo-branch {
-      font-size: 0.75rem;
-      color: var(--apollon-text-secondary, #6c757d);
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-  }
-`;
-
-const SyncStatus = styled.div<{ $status: 'synced' | 'pending' | 'error' }>`
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.75rem;
-  padding: 6px 10px;
-  border-radius: 6px;
-  margin-bottom: 12px;
-  
-  ${props => {
-    switch (props.$status) {
-      case 'synced':
-        return `
-          background: rgba(40, 167, 69, 0.1);
-          color: #28a745;
-        `;
-      case 'pending':
-        return `
-          background: rgba(255, 193, 7, 0.1);
-          color: #856404;
-        `;
-      case 'error':
-        return `
-          background: rgba(220, 53, 69, 0.1);
-          color: #dc3545;
-        `;
-    }
-  }}
-`;
-
-const ActionButtons = styled.div`
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  
-  .btn {
-    font-size: 0.8rem;
-    padding: 6px 10px;
-  }
-`;
-
-const CommitList = styled(ListGroup)`
-  max-height: 280px;
-  overflow-y: auto;
-  border-radius: 8px;
-  
-  .list-group-item {
-    padding: 10px 12px;
-    border-color: var(--apollon-border, #dee2e6);
-    background: var(--apollon-background, #fff);
-    
-    .dark-mode & {
-      background: #2d3238;
-      border-color: #3d4449;
-    }
-    
-    &:hover {
-      background: var(--apollon-background-hover, #f8f9fa);
-      
-      .dark-mode & {
-        background: #353b42;
-      }
-    }
-  }
-`;
-
-const CommitItem = styled.div`
-  .commit-message {
-    font-weight: 500;
-    font-size: 0.85rem;
-    color: var(--apollon-text, #212529);
-    margin-bottom: 4px;
-    word-break: break-word;
-    
-    .dark-mode & {
-      color: #e9ecef;
-    }
-  }
-  
-  .commit-meta {
-    font-size: 0.7rem;
-    color: var(--apollon-text-secondary, #6c757d);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-  
-  .commit-sha {
-    font-family: monospace;
-    background: rgba(0, 0, 0, 0.05);
-    padding: 2px 6px;
-    border-radius: 4px;
-    text-decoration: none;
-    color: inherit;
-    
-    &:hover {
-      background: rgba(0, 0, 0, 0.1);
-    }
-    
-    .dark-mode & {
-      background: rgba(255, 255, 255, 0.1);
-      
-      &:hover {
-        background: rgba(255, 255, 255, 0.15);
-      }
-    }
-  }
-`;
-
-const EmptyState = styled.div`
-  text-align: center;
-  padding: 30px 16px;
-  color: var(--apollon-text-secondary, #6c757d);
-  
-  svg {
-    margin-bottom: 12px;
-    opacity: 0.5;
-  }
-  
-  h6 {
-    margin-bottom: 6px;
-    color: var(--apollon-text, #212529);
-    font-size: 0.95rem;
-    
-    .dark-mode & {
-      color: #e9ecef;
-    }
-  }
-  
-  p {
-    font-size: 0.85rem;
-    margin-bottom: 14px;
-  }
-`;
-
-const RepoListItem = styled(ListGroup.Item)`
-  cursor: pointer;
-  transition: all 0.15s ease;
-  
-  &:hover {
-    background: var(--apollon-background-hover, #f8f9fa) !important;
-    
-    .dark-mode & {
-      background: #353b42 !important;
-    }
-  }
-  
-  .repo-name {
-    font-weight: 500;
-    font-size: 0.9rem;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  
-  .repo-description {
-    font-size: 0.75rem;
-    color: var(--apollon-text-secondary, #6c757d);
-    margin-top: 4px;
-  }
-  
-  .repo-meta {
-    font-size: 0.7rem;
-    color: var(--apollon-text-secondary, #6c757d);
-    margin-top: 4px;
-  }
-`;
+import { BesserProject } from '../../types/project';
 
 interface GitHubSidebarProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+type LinkStep = 'select' | 'configure';
+type SidebarState = 'synced' | 'pending' | 'error';
+
+const statusClass: Record<SidebarState, string> = {
+  synced: 'border border-emerald-200 bg-emerald-50 text-emerald-800',
+  pending: 'border border-amber-200 bg-amber-50 text-amber-800',
+  error: 'border border-red-200 bg-red-50 text-red-800',
+};
+
+const spinner = <Loader2 className="h-4 w-4 animate-spin" />;
+
+const sanitizeRepoName = (value: string): string => {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-_]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+};
+
 export const GitHubSidebar: React.FC<GitHubSidebarProps> = ({ isOpen, onClose }) => {
-  const { isAuthenticated, username, githubSession, login } = useGitHubAuth();
-  const { currentProject, updateCurrentDiagram } = useProject();
+  const { isAuthenticated, githubSession, login } = useGitHubAuth();
+  const { currentProject, updateCurrentDiagram, loadProject } = useProject();
   const apollonEditor = useContext(ApollonEditorContext);
   const editor = apollonEditor?.editor;
-  const diagram = useAppSelector((state) => state.diagram.diagram);
 
   const {
     isLoading,
@@ -394,45 +101,13 @@ export const GitHubSidebar: React.FC<GitHubSidebarProps> = ({ isOpen, onClose })
     createGist,
   } = useGitHubStorage();
 
-  // Modal states
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCommitModal, setShowCommitModal] = useState(false);
   const [showRestoreModal, setShowRestoreModal] = useState(false);
-
   const [showGistModal, setShowGistModal] = useState(false);
   const [showFileBrowser, setShowFileBrowser] = useState(false);
 
-  // Function to save current editor state
-  const saveCurrentEditorState = useCallback(() => {
-    if (editor && currentProject) {
-      try {
-        const currentModel = editor.model;
-        // Update the current diagram in the project
-        updateCurrentDiagram(currentModel);
-        // Force save to storage
-        const project = ProjectStorageRepository.loadProject(currentProject.id);
-        if (project) {
-          ProjectStorageRepository.saveProject(project);
-        }
-        return true;
-      } catch (error) {
-        console.error('Failed to save editor state:', error);
-        return false;
-      }
-    }
-    return true;
-  }, [editor, currentProject, updateCurrentDiagram]);
-
-  // Auto-commit hook
-  const { settings: autoCommitSettings, updateSettings: updateAutoCommitSettings, isAutoCommitting } = useAutoCommit({
-    githubSession,
-    projectId: currentProject?.id || null,
-    linkedRepo,
-    saveCurrentEditorState,
-  });
-
-  // Form states
   const [commitMessage, setCommitMessage] = useState('');
   const [newRepoName, setNewRepoName] = useState('');
   const [newRepoDescription, setNewRepoDescription] = useState('');
@@ -443,8 +118,7 @@ export const GitHubSidebar: React.FC<GitHubSidebarProps> = ({ isOpen, onClose })
   const [hasChanges, setHasChanges] = useState(false);
   const [isCheckingChanges, setIsCheckingChanges] = useState(false);
 
-  // Link configuration states (Step 2 of link modal)
-  const [linkStep, setLinkStep] = useState<'select' | 'configure'>('select');
+  const [linkStep, setLinkStep] = useState<LinkStep>('select');
   const [availableBranches, setAvailableBranches] = useState<string[]>([]);
   const [selectedBranch, setSelectedBranch] = useState('');
   const [linkFileName, setLinkFileName] = useState('');
@@ -452,83 +126,173 @@ export const GitHubSidebar: React.FC<GitHubSidebarProps> = ({ isOpen, onClose })
   const [fileExists, setFileExists] = useState<boolean | null>(null);
   const [isCheckingFile, setIsCheckingFile] = useState(false);
 
-  // Create repo path states
   const [createFileName, setCreateFileName] = useState('');
   const [createFolderPath, setCreateFolderPath] = useState('');
 
-  // Gist states
   const [gistDescription, setGistDescription] = useState('');
   const [isGistPublic, setIsGistPublic] = useState(false);
 
-  // Initialize linked repo when project changes
+  const toProjectJsonFileName = useCallback((value: string): string => {
+    const normalized = value
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '_')
+      .replace(/[^a-z0-9_-]/g, '_')
+      .replace(/^_+|_+$/g, '');
+
+    return `${normalized || 'project'}.json`;
+  }, []);
+
+  const resetLinkModalState = useCallback(() => {
+    setShowLinkModal(false);
+    setLinkStep('select');
+    setSelectedRepo(null);
+    setAvailableBranches([]);
+    setSelectedBranch('');
+    setLinkFileName('');
+    setLinkFolderPath('');
+    setFileExists(null);
+    setShowFileBrowser(false);
+  }, []);
+
+  const persistAndActivateProject = useCallback(
+    async (
+      project: BesserProject,
+      link?: { owner: string; repo: string; branch: string; filePath: string },
+      successMessage?: string,
+    ): Promise<boolean> => {
+      try {
+        ProjectStorageRepository.saveProject(project);
+
+        if (link) {
+          linkRepoOnly(project.id, link.owner, link.repo, link.branch, link.filePath);
+        }
+
+        await loadProject(project.id);
+
+        if (successMessage) {
+          toast.success(successMessage);
+        }
+
+        return true;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to load project';
+        toast.error(message);
+        return false;
+      }
+    },
+    [linkRepoOnly, loadProject],
+  );
+
+  const saveCurrentEditorState = useCallback(() => {
+    if (!editor || !currentProject) {
+      return true;
+    }
+
+    try {
+      const currentModel = editor.model;
+      updateCurrentDiagram(currentModel);
+
+      const project = ProjectStorageRepository.loadProject(currentProject.id);
+      if (project) {
+        ProjectStorageRepository.saveProject(project);
+      }
+      return true;
+    } catch (error) {
+      console.error('Failed to save editor state:', error);
+      return false;
+    }
+  }, [editor, currentProject, updateCurrentDiagram]);
+
+  const { settings: autoCommitSettings, updateSettings: updateAutoCommitSettings, isAutoCommitting } = useAutoCommit({
+    githubSession,
+    projectId: currentProject?.id || null,
+    linkedRepo,
+    saveCurrentEditorState,
+  });
+
+  const computedFilePath = linkFolderPath
+    ? `${linkFolderPath.replace(/^\/+|\/+$/g, '')}/${linkFileName}`
+    : linkFileName;
+
+  const sidebarSyncState: SidebarState = useMemo(() => {
+    if (isCheckingChanges) {
+      return 'pending';
+    }
+    return hasChanges ? 'pending' : 'synced';
+  }, [hasChanges, isCheckingChanges]);
+
+  const sortedRepositories = useMemo(() => {
+    return [...repositories].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+  }, [repositories]);
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  };
+
   useEffect(() => {
     if (currentProject?.id) {
       initLinkedRepo(currentProject.id);
     }
   }, [currentProject?.id, initLinkedRepo]);
 
-  // Fetch repos when link modal opens
   useEffect(() => {
     if (showLinkModal && isAuthenticated && githubSession) {
-      fetchRepositories(githubSession);
+      void fetchRepositories(githubSession);
     }
   }, [showLinkModal, isAuthenticated, githubSession, fetchRepositories]);
 
-  // Fetch commits when sidebar opens and linked
   useEffect(() => {
     if (isOpen && linkedRepo && isAuthenticated && githubSession) {
-      fetchCommits(githubSession, linkedRepo.owner, linkedRepo.repo, linkedRepo.filePath);
+      void fetchCommits(githubSession, linkedRepo.owner, linkedRepo.repo, linkedRepo.filePath);
     }
   }, [isOpen, linkedRepo, isAuthenticated, githubSession, fetchCommits]);
 
-  // Check for changes when sidebar opens
   useEffect(() => {
     const checkChanges = async () => {
-      if (isOpen && linkedRepo && isAuthenticated && githubSession && currentProject) {
-        setIsCheckingChanges(true);
-        try {
-          // Get current project from storage
-          const latestProject = ProjectStorageRepository.loadProject(currentProject.id);
-          if (latestProject) {
-            const hasDiff = await checkForChanges(githubSession, latestProject, linkedRepo);
-            setHasChanges(hasDiff);
-          }
-        } catch (error) {
-          console.error('Failed to check for changes:', error);
-        } finally {
-          setIsCheckingChanges(false);
+      if (!isOpen || !linkedRepo || !isAuthenticated || !githubSession || !currentProject) {
+        return;
+      }
+
+      setIsCheckingChanges(true);
+
+      try {
+        const latestProject = ProjectStorageRepository.loadProject(currentProject.id);
+        if (latestProject) {
+          const hasDiff = await checkForChanges(githubSession, latestProject, linkedRepo);
+          setHasChanges(hasDiff);
         }
+      } catch (error) {
+        console.error('Failed to check for changes:', error);
+      } finally {
+        setIsCheckingChanges(false);
       }
     };
-    checkChanges();
+
+    void checkChanges();
   }, [isOpen, linkedRepo, isAuthenticated, githubSession, currentProject, checkForChanges]);
 
-
-
   const handleSave = useCallback(async () => {
-    if (!linkedRepo || !currentProject || !githubSession) return;
+    if (!linkedRepo || !currentProject || !githubSession) {
+      return;
+    }
 
-    // First, save current editor state
     saveCurrentEditorState();
-
-    // Small delay to ensure storage is updated
-    await new Promise(resolve => setTimeout(resolve, 100));
-
+    await new Promise((resolve) => setTimeout(resolve, 100));
     setShowCommitModal(true);
   }, [linkedRepo, currentProject, githubSession, saveCurrentEditorState]);
 
   const handleConfirmSave = useCallback(async () => {
-    if (!linkedRepo || !currentProject || !githubSession || !commitMessage.trim()) return;
+    if (!linkedRepo || !currentProject || !githubSession || !commitMessage.trim()) {
+      return;
+    }
 
     setIsSaving(true);
 
-    // Save current editor state first
     saveCurrentEditorState();
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
-    // Small delay to ensure storage is updated
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    // Now get the fresh project from storage
     const latestProject = ProjectStorageRepository.loadProject(currentProject.id);
     if (!latestProject) {
       toast.error('Could not load project data');
@@ -543,63 +307,86 @@ export const GitHubSidebar: React.FC<GitHubSidebarProps> = ({ isOpen, onClose })
       linkedRepo.repo,
       commitMessage,
       linkedRepo.branch,
-      linkedRepo.filePath
+      linkedRepo.filePath,
     );
 
     if (result.success) {
       setShowCommitModal(false);
       setCommitMessage('');
-      // Refresh commits
-      fetchCommits(githubSession, linkedRepo.owner, linkedRepo.repo, linkedRepo.filePath);
+      await fetchCommits(githubSession, linkedRepo.owner, linkedRepo.repo, linkedRepo.filePath);
+      setHasChanges(false);
     }
+
     setIsSaving(false);
-  }, [linkedRepo, currentProject, githubSession, commitMessage, saveProjectToGitHub, fetchCommits, saveCurrentEditorState]);
+  }, [
+    linkedRepo,
+    currentProject,
+    githubSession,
+    commitMessage,
+    saveProjectToGitHub,
+    fetchCommits,
+    saveCurrentEditorState,
+  ]);
 
   const handleLoad = useCallback(async () => {
-    if (!linkedRepo || !githubSession) return;
+    if (!linkedRepo || !githubSession) {
+      return;
+    }
 
     const project = await loadProjectFromGitHub(
       githubSession,
       linkedRepo.owner,
       linkedRepo.repo,
       linkedRepo.branch,
-      linkedRepo.filePath
+      linkedRepo.filePath,
     );
 
-    if (project) {
-      // Save the loaded project locally
-      ProjectStorageRepository.saveProject(project);
-      // Reload the page to apply changes
-      window.location.reload();
+    if (!project) {
+      return;
     }
-  }, [linkedRepo, githubSession, loadProjectFromGitHub]);
 
-  // Step 1: Select a repo and move to configure step
-  const handleSelectRepo = useCallback(async (repo: GitHubRepository) => {
-    if (!githubSession || !currentProject) return;
+    const activated = await persistAndActivateProject(
+      project,
+      {
+        owner: linkedRepo.owner,
+        repo: linkedRepo.repo,
+        branch: linkedRepo.branch,
+        filePath: linkedRepo.filePath,
+      },
+      'Project pulled from GitHub',
+    );
 
-    setSelectedRepo(repo);
-    setSelectedBranch(repo.default_branch);
+    if (activated) {
+      onClose();
+    }
+  }, [linkedRepo, githubSession, loadProjectFromGitHub, onClose, persistAndActivateProject]);
 
-    // Set default file name based on project name
-    const defaultFileName = `${currentProject.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '')}.json`;
-    setLinkFileName(defaultFileName);
-    setLinkFolderPath('');
-    setFileExists(null);
+  const handleSelectRepo = useCallback(
+    async (repo: GitHubRepository) => {
+      if (!githubSession || !currentProject) {
+        return;
+      }
 
-    // Fetch branches for the repo
-    const branches = await fetchBranches(githubSession, repo.full_name.split('/')[0], repo.name);
-    setAvailableBranches(branches.length > 0 ? branches : [repo.default_branch]);
+      setSelectedRepo(repo);
+      setSelectedBranch(repo.default_branch);
+      setLinkFileName(toProjectJsonFileName(currentProject.name));
+      setLinkFolderPath('');
+      setFileExists(null);
 
-    // Move to configure step
-    setLinkStep('configure');
-  }, [githubSession, currentProject, fetchBranches]);
+      const branches = await fetchBranches(githubSession, repo.full_name.split('/')[0], repo.name);
+      setAvailableBranches(branches.length > 0 ? branches : [repo.default_branch]);
+      setLinkStep('configure');
+    },
+    [githubSession, currentProject, fetchBranches, toProjectJsonFileName],
+  );
 
-  // Check if file exists in the repo
   const handleCheckFileExists = useCallback(async () => {
-    if (!githubSession || !selectedRepo || !linkFileName) return;
+    if (!githubSession || !selectedRepo || !linkFileName) {
+      return;
+    }
 
     setIsCheckingFile(true);
+
     const fullPath = linkFolderPath
       ? `${linkFolderPath.replace(/^\/+|\/+$/g, '')}/${linkFileName}`
       : linkFileName;
@@ -609,139 +396,182 @@ export const GitHubSidebar: React.FC<GitHubSidebarProps> = ({ isOpen, onClose })
       selectedRepo.full_name.split('/')[0],
       selectedRepo.name,
       selectedBranch,
-      fullPath
+      fullPath,
     );
+
     setFileExists(exists);
     setIsCheckingFile(false);
-  }, [githubSession, selectedRepo, selectedBranch, linkFileName, linkFolderPath, checkFileExists]);
+  }, [githubSession, selectedRepo, linkFileName, linkFolderPath, selectedBranch, checkFileExists]);
 
-  // Compute full file path for display
-  const computedFilePath = linkFolderPath
-    ? `${linkFolderPath.replace(/^\/+|\/+$/g, '')}/${linkFileName}`
-    : linkFileName;
-
-  // Handle loading existing project from repo
   const handleLoadFromRepo = useCallback(async (): Promise<boolean> => {
-    if (!githubSession || !selectedRepo) return false;
-
-    const fullPath = linkFolderPath
-      ? `${linkFolderPath.replace(/^\/+|\/+$/g, '')}/${linkFileName}`
-      : linkFileName;
-
-    const project = await loadProjectFromGitHub(
-      githubSession,
-      selectedRepo.full_name.split('/')[0],
-      selectedRepo.name,
-      selectedBranch,
-      fullPath
-    );
-
-    if (project) {
-      // Save the loaded project locally
-      ProjectStorageRepository.saveProject(project);
-      // Persist the link so subsequent saves go to the same file
-      if (currentProject) {
-        linkRepoOnly(
-          currentProject.id,
-          selectedRepo.full_name.split('/')[0],
-          selectedRepo.name,
-          selectedBranch,
-          fullPath
-        );
-      }
-      // Reload the page to apply changes
-      window.location.reload();
-      return true;
+    if (!githubSession || !selectedRepo) {
+      return false;
     }
-    return false;
-  }, [githubSession, selectedRepo, selectedBranch, linkFileName, linkFolderPath, loadProjectFromGitHub, currentProject, linkRepoOnly]);
 
-  // Step 2: Confirm link (if file exists, prefer loading and linking)
-  const handleConfirmLink = useCallback(async (linkOnly: boolean = false) => {
-    if (!currentProject || !selectedRepo) return;
-
+    const [owner, repo] = selectedRepo.full_name.split('/');
     const fullPath = linkFolderPath
       ? `${linkFolderPath.replace(/^\/+|\/+$/g, '')}/${linkFileName}`
       : linkFileName;
 
-    // If the file already exists (or likely exists), load it and persist the link so we don't overwrite unintentionally
-    if (!linkOnly) {
-      let exists = fileExists;
+    const project = await loadProjectFromGitHub(githubSession, owner, repo, selectedBranch, fullPath);
 
-      // If we don't know yet, check before deciding
-      if (exists === null) {
-        try {
-          exists = await checkFileExists(
-            githubSession ?? '',
-            selectedRepo.full_name.split('/')[0],
-            selectedRepo.name,
-            selectedBranch,
-            fullPath
-          );
-          setFileExists(exists);
-        } catch (error) {
-          console.error('Failed to verify file existence before linking:', error);
+    if (!project) {
+      return false;
+    }
+
+    return persistAndActivateProject(
+      project,
+      { owner, repo, branch: selectedBranch, filePath: fullPath },
+      'Project loaded from GitHub repository',
+    );
+  }, [githubSession, selectedRepo, linkFolderPath, linkFileName, loadProjectFromGitHub, selectedBranch, persistAndActivateProject]);
+
+  const handleConfirmLink = useCallback(
+    async (linkOnly: boolean = false) => {
+      if (!currentProject || !selectedRepo) {
+        return;
+      }
+
+      const [owner, repo] = selectedRepo.full_name.split('/');
+      const fullPath = linkFolderPath
+        ? `${linkFolderPath.replace(/^\/+|\/+$/g, '')}/${linkFileName}`
+        : linkFileName;
+      let targetFileExists = fileExists;
+
+      if (!linkOnly) {
+        if (targetFileExists === null) {
+          try {
+            targetFileExists = await checkFileExists(
+              githubSession ?? '',
+              owner,
+              repo,
+              selectedBranch,
+              fullPath,
+            );
+            setFileExists(targetFileExists);
+          } catch (error) {
+            console.error('Failed to verify file existence before linking:', error);
+          }
+        }
+
+        if (targetFileExists) {
+          const loaded = await handleLoadFromRepo();
+          if (loaded) {
+            resetLinkModalState();
+            onClose();
+            return;
+          }
+          toast.warn('Could not load from repo; linking without loading.');
         }
       }
 
-      if (exists) {
-        const loaded = await handleLoadFromRepo();
-        if (loaded) return;
-        toast.warn('Could not load from repo; linking without loading.');
+      if (!linkOnly && targetFileExists === false) {
+        if (!githubSession) {
+          linkRepoOnly(currentProject.id, owner, repo, selectedBranch, fullPath);
+          toast.warn('Repository linked. Reconnect GitHub to push the initial project file.');
+          resetLinkModalState();
+          return;
+        }
+
+        saveCurrentEditorState();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        const latestProject = ProjectStorageRepository.loadProject(currentProject.id);
+        if (!latestProject) {
+          linkRepoOnly(currentProject.id, owner, repo, selectedBranch, fullPath);
+          toast.warn('Repository linked, but initial push failed because the local project could not be read.');
+          resetLinkModalState();
+          return;
+        }
+
+        const initialPushResult = await saveProjectToGitHub(
+          githubSession,
+          latestProject,
+          owner,
+          repo,
+          'Initial sync from BESSER Web Modeling Editor',
+          selectedBranch,
+          fullPath,
+        );
+
+        if (initialPushResult.success) {
+          await fetchCommits(githubSession, owner, repo, fullPath);
+          setHasChanges(false);
+          resetLinkModalState();
+          return;
+        } else {
+          linkRepoOnly(currentProject.id, owner, repo, selectedBranch, fullPath);
+          toast.warn('Repository linked, but initial push failed. You can push manually from GitHub Sync.');
+          resetLinkModalState();
+          return;
+        }
       }
-    }
 
-    linkRepoOnly(
-      currentProject.id,
-      selectedRepo.full_name.split('/')[0],
-      selectedRepo.name,
-      selectedBranch,
-      fullPath
-    );
-
-    // Reset modal state
-    setShowLinkModal(false);
-    setLinkStep('select');
-    setSelectedRepo(null);
-    setAvailableBranches([]);
-    setFileExists(null);
-  }, [currentProject, selectedRepo, selectedBranch, linkFileName, linkFolderPath, linkRepoOnly, fileExists, handleLoadFromRepo, checkFileExists, githubSession]);
-
-  const fetchSelectedRepoContents = useCallback(async (path: string = ''): Promise<GitHubContentItem[]> => {
-    if (!githubSession || !selectedRepo) return [];
-    try {
-      const [owner, repo] = selectedRepo.full_name.split('/');
-      return await fetchRepoContents(
-        githubSession,
+      linkRepoOnly(
+        currentProject.id,
         owner,
         repo,
-        path,
-        selectedBranch || selectedRepo.default_branch
+        selectedBranch,
+        fullPath,
       );
-    } catch (error) {
-      console.error('Failed to load repository contents:', error);
-      toast.error('Could not load repository contents');
-      return [];
-    }
-  }, [githubSession, selectedRepo, fetchRepoContents, selectedBranch]);
+
+      resetLinkModalState();
+    },
+    [
+      currentProject,
+      selectedRepo,
+      linkFolderPath,
+      linkFileName,
+      fileExists,
+      checkFileExists,
+      githubSession,
+      selectedBranch,
+      handleLoadFromRepo,
+      linkRepoOnly,
+      saveCurrentEditorState,
+      saveProjectToGitHub,
+      fetchCommits,
+      onClose,
+      resetLinkModalState,
+    ],
+  );
+
+  const fetchSelectedRepoContents = useCallback(
+    async (path: string = ''): Promise<GitHubContentItem[]> => {
+      if (!githubSession || !selectedRepo) {
+        return [];
+      }
+
+      try {
+        const [owner, repo] = selectedRepo.full_name.split('/');
+        return await fetchRepoContents(githubSession, owner, repo, path, selectedBranch || selectedRepo.default_branch);
+      } catch (error) {
+        console.error('Failed to load repository contents:', error);
+        toast.error('Could not load repository contents');
+        return [];
+      }
+    },
+    [githubSession, selectedRepo, fetchRepoContents, selectedBranch],
+  );
 
   const handleFileSelectedFromBrowser = useCallback((path: string) => {
     const sanitized = path.replace(/^\/+/, '');
     const segments = sanitized.split('/');
     const file = segments.pop() || '';
     const folder = segments.join('/');
+
     setLinkFileName(file);
     setLinkFolderPath(folder);
-    // Reset existence until user checks or we verify during link
     setFileExists(null);
   }, []);
 
   const handleCreateRepo = useCallback(async () => {
-    if (!currentProject || !githubSession || !newRepoName.trim() || !createFileName.trim()) return;
+    if (!currentProject || !githubSession || !newRepoName.trim() || !createFileName.trim()) {
+      return;
+    }
 
-    // Save current state first
     saveCurrentEditorState();
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     const latestProject = ProjectStorageRepository.loadProject(currentProject.id);
     if (!latestProject) {
@@ -749,7 +579,6 @@ export const GitHubSidebar: React.FC<GitHubSidebarProps> = ({ isOpen, onClose })
       return;
     }
 
-    // Compute full file path
     const fullPath = createFolderPath
       ? `${createFolderPath.replace(/^\/+|\/+$/g, '')}/${createFileName}`
       : createFileName;
@@ -760,7 +589,7 @@ export const GitHubSidebar: React.FC<GitHubSidebarProps> = ({ isOpen, onClose })
       newRepoName,
       newRepoDescription || `BESSER project: ${latestProject.name}`,
       isRepoPrivate,
-      fullPath
+      fullPath,
     );
 
     if (result.success) {
@@ -771,28 +600,45 @@ export const GitHubSidebar: React.FC<GitHubSidebarProps> = ({ isOpen, onClose })
       setCreateFileName('');
       setCreateFolderPath('');
     }
-  }, [currentProject, githubSession, newRepoName, newRepoDescription, isRepoPrivate, createFileName, createFolderPath, createRepositoryForProject, saveCurrentEditorState]);
+  }, [
+    currentProject,
+    githubSession,
+    newRepoName,
+    createFileName,
+    createFolderPath,
+    newRepoDescription,
+    isRepoPrivate,
+    createRepositoryForProject,
+    saveCurrentEditorState,
+  ]);
 
   const handleUnlink = useCallback(() => {
-    if (currentProject?.id) {
-      unlinkRepo(currentProject.id);
-      toast.info('Repository unlinked');
-    }
-  }, [currentProject?.id, unlinkRepo]);
-
-  const handleCommitClick = useCallback((commit: GitHubCommit) => {
-    // Check if this is the latest commit
-    const isLatest = commits.length > 0 && commits[0].sha === commit.sha;
-    if (isLatest) {
-      toast.info('This is already the latest version');
+    if (!currentProject?.id) {
       return;
     }
-    setSelectedCommit(commit);
-    setShowRestoreModal(true);
-  }, [commits]);
+
+    unlinkRepo(currentProject.id);
+    toast.info('Repository unlinked');
+  }, [currentProject?.id, unlinkRepo]);
+
+  const handleCommitClick = useCallback(
+    (commit: GitHubCommit) => {
+      const isLatest = commits.length > 0 && commits[0].sha === commit.sha;
+      if (isLatest) {
+        toast.info('This is already the latest version');
+        return;
+      }
+
+      setSelectedCommit(commit);
+      setShowRestoreModal(true);
+    },
+    [commits],
+  );
 
   const handleRestoreCommit = useCallback(async () => {
-    if (!linkedRepo || !githubSession || !selectedCommit) return;
+    if (!linkedRepo || !githubSession || !selectedCommit) {
+      return;
+    }
 
     setIsSaving(true);
 
@@ -801,27 +647,38 @@ export const GitHubSidebar: React.FC<GitHubSidebarProps> = ({ isOpen, onClose })
       linkedRepo.owner,
       linkedRepo.repo,
       selectedCommit.sha,
-      linkedRepo.filePath
+      linkedRepo.filePath,
     );
 
     if (project) {
-      // Save the loaded project locally
-      ProjectStorageRepository.saveProject(project);
-      setShowRestoreModal(false);
-      setSelectedCommit(null);
-      // Reload the page to apply changes
-      window.location.reload();
+      const activated = await persistAndActivateProject(
+        project,
+        {
+          owner: linkedRepo.owner,
+          repo: linkedRepo.repo,
+          branch: linkedRepo.branch,
+          filePath: linkedRepo.filePath,
+        },
+        'Project restored from selected commit',
+      );
+
+      if (activated) {
+        setShowRestoreModal(false);
+        setSelectedCommit(null);
+        onClose();
+      }
     }
+
     setIsSaving(false);
-  }, [linkedRepo, githubSession, selectedCommit, loadProjectFromCommit]);
+  }, [linkedRepo, githubSession, selectedCommit, loadProjectFromCommit, persistAndActivateProject, onClose]);
 
-  // Create a Gist from the current project
   const handleCreateGist = useCallback(async () => {
-    if (!currentProject || !githubSession) return;
+    if (!currentProject || !githubSession) {
+      return;
+    }
 
-    // Save current state first
     saveCurrentEditorState();
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     const latestProject = ProjectStorageRepository.loadProject(currentProject.id);
     if (!latestProject) {
@@ -833,478 +690,465 @@ export const GitHubSidebar: React.FC<GitHubSidebarProps> = ({ isOpen, onClose })
       githubSession,
       latestProject,
       gistDescription || `BESSER Project: ${latestProject.name}`,
-      isGistPublic
+      isGistPublic,
     );
 
     if (result.success && result.gistUrl) {
       setShowGistModal(false);
       setGistDescription('');
       setIsGistPublic(false);
-      // Open the gist in a new tab
       window.open(result.gistUrl, '_blank');
     }
-  }, [currentProject, githubSession, gistDescription, isGistPublic, createGist, saveCurrentEditorState]);
+  }, [currentProject, githubSession, createGist, gistDescription, isGistPublic, saveCurrentEditorState]);
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  // Not authenticated view
   const renderUnauthenticated = () => (
-    <EmptyState>
-      <Github size={40} />
-      <h6>Connect to GitHub</h6>
-      <p>Sign in to sync your projects with GitHub.</p>
-      <Button variant="dark" size="sm" onClick={login}>
-        <Github className="me-2" /> Connect GitHub
+    <div className="space-y-4 rounded-xl border border-dashed border-border/70 bg-muted/30 px-5 py-10 text-center">
+      <Github className="mx-auto h-8 w-8 text-muted-foreground" />
+      <div className="space-y-1">
+        <p className="text-sm font-semibold">Connect to GitHub</p>
+        <p className="text-xs text-muted-foreground">Sign in to sync your projects with GitHub.</p>
+      </div>
+      <Button onClick={login} className="gap-2">
+        <Github className="h-4 w-4" />
+        Connect GitHub
       </Button>
-    </EmptyState>
+    </div>
   );
 
-  // No project selected view
   const renderNoProject = () => (
-    <EmptyState>
-      <ExclamationTriangle size={40} />
-      <h6>No Project Selected</h6>
-      <p>Open or create a project to use GitHub sync.</p>
-    </EmptyState>
+    <div className="space-y-3 rounded-xl border border-dashed border-border/70 bg-muted/30 px-5 py-10 text-center">
+      <AlertTriangle className="mx-auto h-8 w-8 text-amber-600" />
+      <p className="text-sm font-semibold">No Project Selected</p>
+      <p className="text-xs text-muted-foreground">Open or create a project to use GitHub sync.</p>
+    </div>
   );
 
-  // Not linked view
   const renderNotLinked = () => (
-    <EmptyState>
-      <Link45deg size={40} />
-      <h6>Link a Repository</h6>
-      <p>Connect your project to a GitHub repo for version control.</p>
-      <div className="d-flex gap-2 justify-content-center flex-wrap">
-        <Button
-          variant="outline-dark"
-          size="sm"
-          className="d-inline-flex align-items-center"
-          onClick={() => setShowLinkModal(true)}
-        >
-          <Link45deg className="me-1" style={{ transform: 'translateY(6px)' }} /> Link Existing
+    <div className="space-y-4 rounded-xl border border-dashed border-border/70 bg-muted/30 px-5 py-8 text-center">
+      <Link2 className="mx-auto h-8 w-8 text-muted-foreground" />
+      <div className="space-y-1">
+        <p className="text-sm font-semibold">Link a Repository</p>
+        <p className="text-xs text-muted-foreground">Connect this project to a GitHub repo for version control.</p>
+      </div>
+      <div className="grid gap-2">
+        <Button variant="outline" className="gap-2" onClick={() => setShowLinkModal(true)}>
+          <Link2 className="h-4 w-4" />
+          Link Existing
         </Button>
         <Button
-          variant="dark"
-          size="sm"
-          className="d-inline-flex align-items-center"
+          className="gap-2"
           onClick={() => {
-          if (currentProject) {
-            const sanitizedName = currentProject.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '');
-            setNewRepoName(sanitizedName);
-            setNewRepoDescription(currentProject.description);
-            setCreateFileName(`${sanitizedName}.json`);
-            setCreateFolderPath('');
-          }
-          setShowCreateModal(true);
-        }}>
-          <PlusCircle className="me-1" style={{ transform: 'translateY(6px)' }} /> Create New
+            if (currentProject) {
+              const sanitizedName = sanitizeRepoName(currentProject.name);
+              setNewRepoName(sanitizedName || 'project');
+              setNewRepoDescription(currentProject.description);
+              setCreateFileName(toProjectJsonFileName(currentProject.name));
+              setCreateFolderPath('');
+            }
+            setShowCreateModal(true);
+          }}
+        >
+          <PlusCircle className="h-4 w-4" />
+          Create New
         </Button>
       </div>
-    </EmptyState>
+    </div>
   );
 
-  // Linked view
   const renderLinked = () => (
-    <>
-      <Section>
-        <SectionTitle>
-          <Link45deg size={14} /> Repository
-        </SectionTitle>
-        <LinkedRepoCard>
-          <RepoInfo>
-            <div className="repo-icon">
-              <Github size={18} />
-            </div>
-            <div className="repo-details">
-              <div className="repo-name">{linkedRepo?.owner}/{linkedRepo?.repo}</div>
-              <div className="repo-branch">
-                <Badge bg="secondary" style={{ fontSize: '0.65rem' }}>{linkedRepo?.branch}</Badge>
-              </div>
-            </div>
-          </RepoInfo>
+    <div className="space-y-5">
+      <section className="space-y-2">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <Link2 className="h-3.5 w-3.5" />
+          Repository
+        </div>
 
-          <SyncStatus $status={isCheckingChanges ? 'pending' : hasChanges ? 'pending' : 'synced'}>
+        <div className="space-y-3 rounded-xl border border-border/70 bg-card p-4">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 rounded-md bg-slate-900 p-2 text-white">
+              <Github className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold">
+                {linkedRepo?.owner}/{linkedRepo?.repo}
+              </p>
+              <Badge variant="secondary" className="mt-1 text-[11px]">
+                {linkedRepo?.branch}
+              </Badge>
+            </div>
+          </div>
+
+          <div className={cn('flex items-center gap-2 rounded-md px-2.5 py-2 text-xs', statusClass[sidebarSyncState])}>
             {isCheckingChanges ? (
               <>
-                <Spinner animation="border" size="sm" style={{ width: 12, height: 12 }} /> Checking...
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Checking...
               </>
             ) : hasChanges ? (
               <>
-                <ExclamationTriangle size={12} /> You have unsaved changes
+                <AlertTriangle className="h-3.5 w-3.5" />
+                You have unsaved changes
               </>
             ) : (
               <>
-                <Check2Circle size={12} /> Up to date
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Up to date
               </>
             )}
-          </SyncStatus>
+          </div>
 
-          <ActionButtons>
-            <Button
-              variant="success"
-              size="sm"
-              onClick={handleSave}
-              disabled={isLoading}
-            >
-              <CloudArrowUp size={14} className="me-1" /> Push
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" className="gap-1" onClick={() => void handleSave()} disabled={isLoading}>
+              <CloudUpload className="h-3.5 w-3.5" />
+              Push
             </Button>
-            <Button
-              variant="outline-primary"
-              size="sm"
-              onClick={handleLoad}
-              disabled={isLoading}
-            >
-              <CloudArrowDown size={14} className="me-1" /> Pull
+            <Button size="sm" variant="outline" className="gap-1" onClick={() => void handleLoad()} disabled={isLoading}>
+              <CloudDownload className="h-3.5 w-3.5" />
+              Pull
             </Button>
-            <OverlayTrigger placement="top" overlay={<Tooltip>Open on GitHub</Tooltip>}>
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                as="a"
-                href={`https://github.com/${linkedRepo?.owner}/${linkedRepo?.repo}`}
-                target="_blank"
-              >
-                <BoxArrowUpRight size={12} />
-              </Button>
-            </OverlayTrigger>
-            <OverlayTrigger placement="top" overlay={<Tooltip>Unlink</Tooltip>}>
-              <Button variant="outline-danger" size="sm" onClick={handleUnlink}>
-                <XCircle size={12} />
-              </Button>
-            </OverlayTrigger>
-          </ActionButtons>
-        </LinkedRepoCard>
-      </Section>
+            <Button size="sm" variant="outline" asChild>
+              <a href={`https://github.com/${linkedRepo?.owner}/${linkedRepo?.repo}`} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleUnlink} className="text-destructive hover:text-destructive">
+              <Unlink2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      </section>
 
-
-
-      <Section>
-        <SectionTitle>
-          <ClockHistory size={14} /> History
+      <section className="space-y-2">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <History className="h-3.5 w-3.5" />
+          History
           <Button
-            variant="link"
-            size="sm"
-            className="p-0 ms-auto"
+            variant="ghost"
+            size="icon"
+            className="ml-auto h-7 w-7"
             onClick={() => linkedRepo && githubSession && fetchCommits(githubSession, linkedRepo.owner, linkedRepo.repo, linkedRepo.filePath)}
             disabled={isLoading}
-            style={{ fontSize: '0.75rem' }}
           >
-            <ArrowClockwise size={12} />
+            {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
           </Button>
-        </SectionTitle>
+        </div>
 
-        {isLoading ? (
-          <div className="text-center py-3">
-            <Spinner animation="border" size="sm" />
-          </div>
-        ) : commits.length > 0 ? (
-          <CommitList>
-            {commits.slice(0, 10).map((commit, index) => (
-              <ListGroup.Item
-                key={commit.sha}
-                action={index > 0}
-                onClick={() => index > 0 && handleCommitClick(commit)}
-                style={{ cursor: index > 0 ? 'pointer' : 'default' }}
-              >
-                <CommitItem>
-                  <div className="commit-message">
-                    {index === 0 && <Badge bg="success" style={{ fontSize: '0.6rem', marginRight: '6px' }}>Latest</Badge>}
-                    {commit.message}
-                  </div>
-                  <div className="commit-meta">
-                    <span>{commit.author}</span>
-                    <span>•</span>
-                    <span>{formatDate(commit.date)}</span>
-                    <a
-                      href={commit.html_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="commit-sha"
-                      onClick={(e) => e.stopPropagation()}
+        <div className="max-h-72 overflow-y-auto rounded-xl border border-border/70 bg-card">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8 text-muted-foreground">{spinner}</div>
+          ) : commits.length > 0 ? (
+            <ul className="divide-y divide-border/60">
+              {commits.slice(0, 10).map((commit, index) => {
+                const canRestore = index > 0;
+                return (
+                  <li key={commit.sha}>
+                    <button
+                      type="button"
+                      disabled={!canRestore}
+                      onClick={() => canRestore && handleCommitClick(commit)}
+                      className={cn(
+                        'w-full px-3 py-2.5 text-left transition-colors',
+                        canRestore ? 'hover:bg-muted/40' : 'cursor-default',
+                      )}
                     >
-                      {commit.sha.substring(0, 7)}
-                    </a>
-                    {index > 0 && (
-                      <span style={{ color: 'var(--apollon-text-secondary)', fontSize: '0.65rem' }}>
-                        Click to restore
-                      </span>
-                    )}
-                  </div>
-                </CommitItem>
-              </ListGroup.Item>
-            ))}
-          </CommitList>
-        ) : (
-          <p className="text-muted text-center" style={{ fontSize: '0.85rem' }}>No commits yet</p>
-        )}
-      </Section>
-
-            <Section>
-        <SectionTitle>
-          <Share size={14} /> Share
-        </SectionTitle>
-        <div className="d-grid gap-2">
-          <Button
-            variant="outline-dark"
-            size="sm"
-            onClick={() => {
-              setGistDescription(currentProject ? `BESSER Project: ${currentProject.name}` : '');
-              setShowGistModal(true);
-            }}
-          >
-            <FileEarmark size={14} className="me-2" /> Create Secret Gist
-          </Button>
+                      <div className="space-y-1">
+                        <p className="line-clamp-2 text-sm font-medium">
+                          {index === 0 && (
+                            <Badge className="mr-2 bg-emerald-600 text-[10px] text-white hover:bg-emerald-600">Latest</Badge>
+                          )}
+                          {commit.message}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                          <span>{commit.author}</span>
+                          <span>-</span>
+                          <span>{formatDate(commit.date)}</span>
+                          <a
+                            href={commit.html_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(event) => event.stopPropagation()}
+                            className="rounded bg-muted px-1.5 py-0.5 font-mono hover:bg-muted/80"
+                          >
+                            {commit.sha.substring(0, 7)}
+                          </a>
+                          {canRestore && <span className="text-amber-700">Click to restore</span>}
+                        </div>
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="px-4 py-6 text-center text-xs text-muted-foreground">No commits yet</p>
+          )}
         </div>
-      </Section>
+      </section>
 
-      <Section>
-        <SectionTitle>
-          <Gear size={14} /> Settings
-        </SectionTitle>
-        <div className="d-flex align-items-center justify-content-between p-2 border rounded" style={{ background: 'var(--apollon-background-secondary, #f8f9fa)' }}>
-          <div>
-            <div className="fw-bold" style={{ fontSize: '0.85rem' }}>Auto-commit</div>
-            <div className="text-muted" style={{ fontSize: '0.75rem' }}>
-              {autoCommitSettings.enabled
-                ? `Enabled (${autoCommitSettings.intervalMinutes}m)`
-                : 'Disabled'}
+      <section className="space-y-2">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <Share2 className="h-3.5 w-3.5" />
+          Share
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full justify-start gap-2"
+          onClick={() => {
+            setGistDescription(currentProject ? `BESSER Project: ${currentProject.name}` : '');
+            setShowGistModal(true);
+          }}
+        >
+          <FileText className="h-4 w-4" />
+          Create Secret Gist
+        </Button>
+      </section>
+
+      <section className="space-y-2">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <Settings className="h-3.5 w-3.5" />
+          Settings
+        </div>
+
+        <div className="space-y-3 rounded-xl border border-border/70 bg-card p-3">
+          <label className="flex items-center justify-between gap-2 text-sm">
+            <div>
+              <p className="font-medium">Auto-commit</p>
+              <p className="text-xs text-muted-foreground">
+                {autoCommitSettings.enabled ? `Enabled (${autoCommitSettings.intervalMinutes}m)` : 'Disabled'}
+              </p>
             </div>
-          </div>
-          <Form.Check
-            type="switch"
-            id="auto-commit-switch"
-            checked={autoCommitSettings.enabled}
-            onChange={(e) => updateAutoCommitSettings({ enabled: e.target.checked })}
-            disabled={!linkedRepo}
-          />
+            <input
+              type="checkbox"
+              checked={autoCommitSettings.enabled}
+              onChange={(event) => updateAutoCommitSettings({ enabled: event.target.checked })}
+              disabled={!linkedRepo}
+              className="h-4 w-4 rounded border-border"
+            />
+          </label>
+
+          {autoCommitSettings.enabled && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">Interval (minutes)</Label>
+              <select
+                value={autoCommitSettings.intervalMinutes}
+                onChange={(event) => updateAutoCommitSettings({ intervalMinutes: parseInt(event.target.value, 10) })}
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="5">5 minutes</option>
+                <option value="10">10 minutes</option>
+                <option value="15">15 minutes</option>
+                <option value="30">30 minutes</option>
+                <option value="60">1 hour</option>
+              </select>
+            </div>
+          )}
+
+          {isAutoCommitting && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Auto-saving...
+            </div>
+          )}
         </div>
-        {autoCommitSettings.enabled && (
-          <div className="mt-2">
-            <Form.Label style={{ fontSize: '0.8rem' }}>Interval (minutes)</Form.Label>
-            <Form.Select
-              size="sm"
-              value={autoCommitSettings.intervalMinutes}
-              onChange={(e) => updateAutoCommitSettings({ intervalMinutes: parseInt(e.target.value) })}
-            >
-              <option value="5">5 minutes</option>
-              <option value="10">10 minutes</option>
-              <option value="15">15 minutes</option>
-              <option value="30">30 minutes</option>
-              <option value="60">1 hour</option>
-            </Form.Select>
-          </div>
-        )}
-        {isAutoCommitting && (
-          <div className="mt-2 text-muted" style={{ fontSize: '0.75rem' }}>
-            <Spinner animation="border" size="sm" style={{ width: 10, height: 10 }} className="me-1" />
-            Auto-saving...
-          </div>
-        )}
-      </Section>
-    </>
+      </section>
+    </div>
   );
 
   return (
     <>
-      <SidebarOverlay $isOpen={isOpen} onClick={onClose} />
+      <div
+        onClick={onClose}
+        className={cn(
+          'fixed inset-0 top-14 z-40 bg-black/30 transition-all duration-200',
+          isOpen ? 'visible opacity-100 pointer-events-auto' : 'invisible opacity-0 pointer-events-none',
+        )}
+      />
 
-      <SidebarContainer $isOpen={isOpen}>
-        <SidebarHeader>
-          <h5>
-            <Github size={18} /> GitHub Sync
-          </h5>
-          <CloseButton onClick={onClose}>
-            <X size={20} />
-          </CloseButton>
-        </SidebarHeader>
+      <aside
+        className={cn(
+          'fixed right-0 top-14 z-50 h-[calc(100vh-56px)] w-[380px] max-w-[96vw] border-l border-border/70 bg-background shadow-xl transition-all duration-200',
+          isOpen
+            ? 'visible translate-x-0 opacity-100 pointer-events-auto'
+            : 'invisible translate-x-full opacity-0 pointer-events-none',
+        )}
+      >
+        <header className="flex items-center justify-between border-b border-border/70 px-4 py-3">
+          <h3 className="flex items-center gap-2 text-sm font-semibold">
+            <Github className="h-4 w-4" />
+            GitHub Sync
+          </h3>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </header>
 
-        <SidebarContent>
+        <div className="h-[calc(100%-53px)] overflow-y-auto p-4">
           {!isAuthenticated && renderUnauthenticated()}
           {isAuthenticated && !currentProject && renderNoProject()}
           {isAuthenticated && currentProject && !linkedRepo && renderNotLinked()}
           {isAuthenticated && currentProject && linkedRepo && renderLinked()}
-        </SidebarContent>
-      </SidebarContainer>
+        </div>
+      </aside>
 
-      {/* Link Repository Modal - Two-Step Flow */}
-      <Modal show={showLinkModal} onHide={() => { setShowLinkModal(false); setLinkStep('select'); setSelectedRepo(null); setShowFileBrowser(false); }} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>
-            {linkStep === 'select' ? 'Link to Repository' : (
-              <div className="d-flex align-items-center gap-2">
-                <Button variant="link" size="sm" className="p-0" onClick={() => setLinkStep('select')}>
-                  <ArrowLeft size={18} />
+      <Dialog open={showLinkModal} onOpenChange={(open) => !open && resetLinkModalState()}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {linkStep === 'configure' && (
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setLinkStep('select')}>
+                  <ArrowLeft className="h-4 w-4" />
                 </Button>
-                Configure Link
-              </div>
-            )}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {linkStep === 'select' ? (
-            <>
-              <p className="text-muted mb-3" style={{ fontSize: '0.9rem' }}>
-                Select a repository to sync your project with.
-              </p>
-
-              {isLoading ? (
-                <div className="text-center py-4">
-                  <Spinner animation="border" size="sm" />
-                  <p className="mt-2 text-muted">Loading...</p>
-                </div>
-              ) : (
-                <ListGroup style={{ maxHeight: '350px', overflowY: 'auto' }}>
-                  {repositories.map((repo) => (
-                    <RepoListItem
-                      key={repo.id}
-                      action
-                      onClick={() => handleSelectRepo(repo)}
-                    >
-                      <div className="repo-name">
-                        <Github size={14} />
-                        {repo.full_name}
-                        {repo.private && <Badge bg="secondary" style={{ fontSize: '0.65rem' }}>Private</Badge>}
-                      </div>
-                      {repo.description && (
-                        <div className="repo-description">{repo.description}</div>
-                      )}
-                      <div className="repo-meta">
-                        Updated: {formatDate(repo.updated_at)}
-                      </div>
-                    </RepoListItem>
-                  ))}
-                  {repositories.length === 0 && (
-                    <ListGroup.Item className="text-center text-muted">
-                      No repositories found
-                    </ListGroup.Item>
-                  )}
-                </ListGroup>
               )}
-            </>
+              {linkStep === 'select' ? 'Link to Repository' : 'Configure Link'}
+            </DialogTitle>
+            <DialogDescription>
+              {linkStep === 'select'
+                ? 'Select a repository to sync your project with.'
+                : 'Set branch and file path for this project sync.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {linkStep === 'select' ? (
+            <div className="max-h-[46vh] overflow-y-auto rounded-md border border-border/70">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8 text-muted-foreground">{spinner}</div>
+              ) : sortedRepositories.length > 0 ? (
+                <ul className="divide-y divide-border/60">
+                  {sortedRepositories.map((repo) => (
+                    <li key={repo.id}>
+                      <button
+                        type="button"
+                        onClick={() => void handleSelectRepo(repo)}
+                        className="w-full px-3 py-2.5 text-left hover:bg-muted/40"
+                      >
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          <Github className="h-4 w-4" />
+                          <span className="truncate">{repo.full_name}</span>
+                          {repo.private && <Badge variant="secondary" className="text-[10px]">Private</Badge>}
+                        </div>
+                        {repo.description && <p className="mt-1 text-xs text-muted-foreground">{repo.description}</p>}
+                        <p className="mt-1 text-[11px] text-muted-foreground">Updated: {formatDate(repo.updated_at)}</p>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="px-4 py-6 text-center text-sm text-muted-foreground">No repositories found</p>
+              )}
+            </div>
           ) : (
-            <>
-              {/* Step 2: Configure branch and file path */}
-              <div className="mb-3 p-2 rounded" style={{ background: 'var(--apollon-background-secondary, #f8f9fa)' }}>
-                <div className="d-flex align-items-center gap-2">
-                  <Github size={16} />
-                  <strong>{selectedRepo?.full_name}</strong>
-                </div>
+            <div className="space-y-4">
+              <div className="rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-sm font-medium">
+                {selectedRepo?.full_name}
               </div>
 
-              <Form>
-                <Form.Group className="mb-3">
-                  <Form.Label>Branch</Form.Label>
-                  <Form.Select
-                    size="sm"
-                    value={selectedBranch}
-                    onChange={(e) => { setSelectedBranch(e.target.value); setFileExists(null); }}
-                  >
-                    {availableBranches.map((branch) => (
-                      <option key={branch} value={branch}>{branch}</option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
+              <div className="space-y-1.5">
+                <Label>Branch</Label>
+                <select
+                  value={selectedBranch}
+                  onChange={(event) => {
+                    setSelectedBranch(event.target.value);
+                    setFileExists(null);
+                  }}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  {availableBranches.map((branch) => (
+                    <option key={branch} value={branch}>
+                      {branch}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                <Form.Group className="mb-3">
-                  <Form.Label><Folder size={14} className="me-1" /> Folder Path (optional)</Form.Label>
-                  <Form.Control
-                    type="text"
-                    placeholder="e.g., projects/my-models"
-                    value={linkFolderPath}
-                    onChange={(e) => { setLinkFolderPath(e.target.value); setFileExists(null); }}
-                    size="sm"
-                  />
-                  <Form.Text className="text-muted">
-                    Leave empty to save in repository root.
-                  </Form.Text>
-                </Form.Group>
+              <div className="space-y-1.5">
+                <Label>Folder Path (optional)</Label>
+                <Input
+                  placeholder="e.g., projects/my-models"
+                  value={linkFolderPath}
+                  onChange={(event) => {
+                    setLinkFolderPath(event.target.value);
+                    setFileExists(null);
+                  }}
+                />
+              </div>
 
-                <Form.Group className="mb-3">
-                  <Form.Label><FileEarmark size={14} className="me-1" /> File Name</Form.Label>
-                  <Form.Control
-                    type="text"
-                    placeholder="my-project.json"
-                    value={linkFileName}
-                    onChange={(e) => { setLinkFileName(e.target.value.replace(/\s+/g, '-')); setFileExists(null); }}
-                    size="sm"
-                  />
-                </Form.Group>
+              <div className="space-y-1.5">
+                <Label>File Name</Label>
+                <Input
+                  placeholder="my_project.json"
+                  value={linkFileName}
+                  onChange={(event) => {
+                    setLinkFileName(event.target.value.replace(/\s+/g, '_'));
+                    setFileExists(null);
+                  }}
+                />
+              </div>
 
-                <div className="d-flex align-items-center gap-2 mb-3">
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    onClick={() => setShowFileBrowser(true)}
-                    disabled={!selectedRepo || !githubSession}
-                  >
-                    <Folder size={14} className="me-1" /> Browse repository files
-                  </Button>
-                  <span className="text-muted" style={{ fontSize: '0.8rem' }}>
-                    Pick an existing project file without typing the path.
-                  </span>
-                </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowFileBrowser(true)}
+                  disabled={!selectedRepo || !githubSession}
+                  className="gap-1"
+                >
+                  <FolderOpen className="h-4 w-4" />
+                  Browse repository files
+                </Button>
+                <span className="text-xs text-muted-foreground">Pick an existing project file without typing the path.</span>
+              </div>
 
-                {/* Preview path */}
-                <div className="mb-3 p-2 rounded" style={{ background: 'var(--apollon-background-secondary, #f8f9fa)', fontSize: '0.85rem' }}>
-                  <strong>Full path:</strong> <code>/{computedFilePath}</code>
-                </div>
+              <div className="rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-xs">
+                <span className="font-semibold">Full path:</span> <code>/{computedFilePath}</code>
+              </div>
 
-                {/* Check if file exists */}
-                <div className="mb-3">
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    onClick={handleCheckFileExists}
-                    disabled={isCheckingFile || !linkFileName}
-                  >
-                    {isCheckingFile ? <Spinner animation="border" size="sm" /> : 'Check if file exists'}
-                  </Button>
+              <div className="space-y-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handleCheckFileExists()}
+                  disabled={isCheckingFile || !linkFileName}
+                >
+                  {isCheckingFile ? spinner : 'Check if file exists'}
+                </Button>
 
-                  {fileExists === true && (
-                    <div className="mt-2 p-2 rounded" style={{ background: 'rgba(255, 193, 7, 0.1)', fontSize: '0.85rem' }}>
-                      <ExclamationTriangle size={14} className="me-1 text-warning" />
-                      File already exists in repository. Choose how to proceed:
-                      <div className="mt-2 d-flex gap-2">
-                        <Button variant="outline-primary" size="sm" onClick={() => handleConfirmLink()}>
-                          <CloudArrowDown size={14} className="me-1" /> Load & link (recommended)
-                        </Button>
-                        <Button variant="outline-warning" size="sm" onClick={() => handleConfirmLink(true)}>
-                          Link without loading (may overwrite)
-                        </Button>
-                      </div>
+                {fileExists === true && (
+                  <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                    <p>File already exists in repository. Choose how to proceed:</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" onClick={() => void handleConfirmLink()} className="gap-1">
+                        <CloudDownload className="h-4 w-4" />
+                        Load & link (recommended)
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => void handleConfirmLink(true)}>
+                        Link without loading (may overwrite)
+                      </Button>
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {fileExists === false && (
-                    <div className="mt-2 p-2 rounded" style={{ background: 'rgba(40, 167, 69, 0.1)', fontSize: '0.85rem' }}>
-                      <Check2Circle size={14} className="me-1 text-success" />
-                      File path is available. Click "Link Repository" to continue.
-                    </div>
-                  )}
-                </div>
-              </Form>
-            </>
+                {fileExists === false && (
+                  <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                    File path is available. Click "Link Repository" to continue.
+                  </div>
+                )}
+              </div>
+            </div>
           )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" size="sm" onClick={() => { setShowLinkModal(false); setLinkStep('select'); setSelectedRepo(null); setShowFileBrowser(false); }}>
-            Cancel
-          </Button>
-          {linkStep === 'configure' && (
-          <Button
-            variant="dark"
-            size="sm"
-            onClick={() => handleConfirmLink()}
-            disabled={!linkFileName}
-          >
-              <Link45deg size={14} className="me-1" /> {fileExists ? 'Load & Link' : 'Link Repository'}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={resetLinkModalState}>
+              Cancel
             </Button>
-          )}
-        </Modal.Footer>
-      </Modal>
+            {linkStep === 'configure' && (
+              <Button onClick={() => void handleConfirmLink()} disabled={!linkFileName}>
+                {fileExists ? 'Load & Link' : 'Link Repository'}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <FileBrowserModal
         show={showFileBrowser}
@@ -1316,222 +1160,208 @@ export const GitHubSidebar: React.FC<GitHubSidebarProps> = ({ isOpen, onClose })
         initialPath={linkFolderPath}
       />
 
-      {/* Create Repository Modal */}
-      <Modal show={showCreateModal} onHide={() => setShowCreateModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Create Repository</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form>
-            <Form.Group className="mb-3">
-              <Form.Label>Repository Name</Form.Label>
-              <Form.Control
-                type="text"
+      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Create Repository</DialogTitle>
+            <DialogDescription>Create a new GitHub repository and push the current project.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Repository Name</Label>
+              <Input
                 placeholder="my-project"
                 value={newRepoName}
-                onChange={(e) => setNewRepoName(e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, ''))}
-                size="sm"
+                onChange={(event) => setNewRepoName(sanitizeRepoName(event.target.value))}
               />
-              <Form.Text className="text-muted">
-                Only lowercase letters, numbers, dashes, and underscores allowed.
-              </Form.Text>
-            </Form.Group>
+              <p className="text-xs text-muted-foreground">
+                Only lowercase letters, numbers, dashes, and underscores are allowed.
+              </p>
+            </div>
 
-            <Form.Group className="mb-3">
-              <Form.Label>Description</Form.Label>
-              <Form.Control
-                as="textarea"
+            <div className="space-y-1.5">
+              <Label>Description</Label>
+              <Textarea
                 rows={2}
                 placeholder="Optional description..."
                 value={newRepoDescription}
-                onChange={(e) => setNewRepoDescription(e.target.value)}
-                size="sm"
+                onChange={(event) => setNewRepoDescription(event.target.value)}
               />
-            </Form.Group>
+            </div>
 
-            <hr style={{ margin: '16px 0' }} />
-            <p className="text-muted mb-2" style={{ fontSize: '0.85rem' }}>
-              <strong>Project File Location</strong>
-            </p>
-
-            <Form.Group className="mb-3">
-              <Form.Label><Folder size={14} className="me-1" /> Folder Path (optional)</Form.Label>
-              <Form.Control
-                type="text"
+            <div className="space-y-1.5">
+              <Label>Folder Path (optional)</Label>
+              <Input
                 placeholder="e.g., projects/my-models"
                 value={createFolderPath}
-                onChange={(e) => setCreateFolderPath(e.target.value)}
-                size="sm"
+                onChange={(event) => setCreateFolderPath(event.target.value)}
               />
-              <Form.Text className="text-muted">
-                Leave empty to save in repository root.
-              </Form.Text>
-            </Form.Group>
-
-            <Form.Group className="mb-3">
-              <Form.Label><FileEarmark size={14} className="me-1" /> File Name</Form.Label>
-              <Form.Control
-                type="text"
-                placeholder="my-project.json"
-                value={createFileName}
-                onChange={(e) => setCreateFileName(e.target.value.replace(/\s+/g, '-'))}
-                size="sm"
-              />
-            </Form.Group>
-
-            {/* Preview path */}
-            <div className="mb-3 p-2 rounded" style={{ background: 'var(--apollon-background-secondary, #f8f9fa)', fontSize: '0.85rem' }}>
-              <strong>Full path:</strong> <code>/{createFolderPath ? `${createFolderPath.replace(/^\/+|\/+$/g, '')}/${createFileName}` : createFileName}</code>
             </div>
 
-            <Form.Group>
-              <Form.Check
+            <div className="space-y-1.5">
+              <Label>File Name</Label>
+              <Input
+                placeholder="my_project.json"
+                value={createFileName}
+                onChange={(event) => setCreateFileName(event.target.value.replace(/\s+/g, '_'))}
+              />
+            </div>
+
+            <div className="rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-xs">
+              <span className="font-semibold">Full path:</span>{' '}
+              <code>
+                /
+                {createFolderPath
+                  ? `${createFolderPath.replace(/^\/+|\/+$/g, '')}/${createFileName}`
+                  : createFileName}
+              </code>
+            </div>
+
+            <label className="flex items-center gap-2 text-sm">
+              <input
                 type="checkbox"
-                label="Private repository"
                 checked={isRepoPrivate}
-                onChange={(e) => setIsRepoPrivate(e.target.checked)}
+                onChange={(event) => setIsRepoPrivate(event.target.checked)}
+                className="h-4 w-4 rounded border-border"
               />
-            </Form.Group>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" size="sm" onClick={() => setShowCreateModal(false)}>
-            Cancel
-          </Button>
-          <Button
-            variant="dark"
-            size="sm"
-            onClick={handleCreateRepo}
-            disabled={isLoading || !newRepoName.trim() || !createFileName.trim()}
-          >
-            {isLoading ? <Spinner animation="border" size="sm" /> : 'Create'}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+              Private repository
+            </label>
+          </div>
 
-      {/* Commit Message Modal */}
-      <Modal show={showCommitModal} onHide={() => setShowCommitModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Push to GitHub</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form>
-            <Form.Group>
-              <Form.Label>Commit Message</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={2}
-                placeholder="Describe your changes..."
-                value={commitMessage}
-                onChange={(e) => setCommitMessage(e.target.value)}
-                autoFocus
-                size="sm"
-              />
-            </Form.Group>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" size="sm" onClick={() => setShowCommitModal(false)}>
-            Cancel
-          </Button>
-          <Button
-            variant="success"
-            size="sm"
-            onClick={handleConfirmSave}
-            disabled={isSaving || !commitMessage.trim()}
-          >
-            {isSaving ? <Spinner animation="border" size="sm" /> : <><CloudArrowUp size={14} className="me-1" /> Push</>}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => void handleCreateRepo()} disabled={isLoading || !newRepoName.trim() || !createFileName.trim()}>
+              {isLoading ? spinner : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* Restore Version Modal */}
-      <Modal show={showRestoreModal} onHide={() => { setShowRestoreModal(false); setSelectedCommit(null); }}>
-        <Modal.Header closeButton>
-          <Modal.Title>Restore Version</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p>Are you sure you want to restore this version?</p>
+      <Dialog open={showCommitModal} onOpenChange={setShowCommitModal}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Push to GitHub</DialogTitle>
+            <DialogDescription>Write a commit message for your changes.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-1.5">
+            <Label>Commit Message</Label>
+            <Textarea
+              rows={2}
+              placeholder="Describe your changes..."
+              value={commitMessage}
+              onChange={(event) => setCommitMessage(event.target.value)}
+              autoFocus
+            />
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCommitModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => void handleConfirmSave()} disabled={isSaving || !commitMessage.trim()} className="gap-2">
+              {isSaving ? spinner : <CloudUpload className="h-4 w-4" />}
+              Push
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showRestoreModal}
+        onOpenChange={(open) => {
+          setShowRestoreModal(open);
+          if (!open) {
+            setSelectedCommit(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Restore Version</DialogTitle>
+            <DialogDescription>
+              Your current unsaved changes will be lost. Consider pushing your current work first.
+            </DialogDescription>
+          </DialogHeader>
+
           {selectedCommit && (
-            <div style={{
-              background: 'var(--apollon-background-secondary, #f8f9fa)',
-              padding: '12px',
-              borderRadius: '8px',
-              marginBottom: '12px'
-            }}>
-              <div style={{ fontWeight: 600, marginBottom: '4px' }}>{selectedCommit.message}</div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--apollon-text-secondary, #6c757d)' }}>
-                {selectedCommit.author} • {formatDate(selectedCommit.date)}
-              </div>
+            <div className="rounded-md border border-border/70 bg-muted/30 px-3 py-2">
+              <p className="text-sm font-semibold">{selectedCommit.message}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {selectedCommit.author} - {formatDate(selectedCommit.date)}
+              </p>
             </div>
           )}
-          <p className="text-muted" style={{ fontSize: '0.85rem' }}>
-            <ExclamationTriangle size={14} className="me-1" />
-            Your current unsaved changes will be lost. Consider pushing your current work first.
-          </p>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" size="sm" onClick={() => { setShowRestoreModal(false); setSelectedCommit(null); }}>
-            Cancel
-          </Button>
-          <Button
-            variant="warning"
-            size="sm"
-            onClick={handleRestoreCommit}
-            disabled={isSaving}
-          >
-            {isSaving ? <Spinner animation="border" size="sm" /> : 'Restore This Version'}
-          </Button>
-        </Modal.Footer>
-      </Modal>
 
-      {/* Create Gist Modal */}
-      <Modal show={showGistModal} onHide={() => setShowGistModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Create Gist</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form>
-            <p className="text-muted small">
-              Create a GitHub Gist to quickly share your project.
-            </p>
-            <Form.Group className="mb-3">
-              <Form.Label>Description</Form.Label>
-              <Form.Control
-                as="textarea"
+          <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <AlertTriangle className="h-4 w-4" />
+            Restore this commit?
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowRestoreModal(false);
+                setSelectedCommit(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={() => void handleRestoreCommit()} disabled={isSaving} className="gap-2">
+              {isSaving ? spinner : null}
+              Restore This Version
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showGistModal} onOpenChange={setShowGistModal}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Create Gist</DialogTitle>
+            <DialogDescription>Create a GitHub Gist to quickly share your project.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Description</Label>
+              <Textarea
                 rows={2}
                 placeholder="Gist description..."
                 value={gistDescription}
-                onChange={(e) => setGistDescription(e.target.value)}
+                onChange={(event) => setGistDescription(event.target.value)}
               />
-            </Form.Group>
-            <Form.Group>
-              <Form.Check
+            </div>
+
+            <label className="flex items-center gap-2 text-sm">
+              <input
                 type="checkbox"
-                label="Public Gist"
                 checked={isGistPublic}
-                onChange={(e) => setIsGistPublic(e.target.checked)}
+                onChange={(event) => setIsGistPublic(event.target.checked)}
+                className="h-4 w-4 rounded border-border"
               />
-              <Form.Text className="text-muted">
-                Secret gists are hidden from search engines but visible to anyone with the link.
-              </Form.Text>
-            </Form.Group>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" size="sm" onClick={() => setShowGistModal(false)}>
-            Cancel
-          </Button>
-          <Button
-            variant="dark"
-            size="sm"
-            onClick={handleCreateGist}
-            disabled={isLoading}
-          >
-            {isLoading ? <Spinner animation="border" size="sm" /> : 'Create Gist'}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+              Public Gist
+            </label>
+
+            <p className="text-xs text-muted-foreground">
+              Secret gists are hidden from search engines but visible to anyone with the link.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowGistModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => void handleCreateGist()} disabled={isLoading}>
+              {isLoading ? spinner : 'Create Gist'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

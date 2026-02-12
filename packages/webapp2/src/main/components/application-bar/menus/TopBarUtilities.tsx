@@ -62,7 +62,7 @@ export const TopBarUtilities: React.FC<TopBarUtilitiesProps> = ({
             variant="outline"
             className={`${outlineButtonClass} px-2.5`}
             onClick={onOpenGitHubSidebar}
-            title="Open GitHub sync panel"
+            title="Toggle GitHub sync panel"
           >
             <PanelRightOpen className="h-4 w-4" />
           </Button>

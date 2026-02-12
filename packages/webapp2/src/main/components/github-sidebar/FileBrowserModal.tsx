@@ -1,232 +1,227 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Modal, Button, ListGroup, Breadcrumb, Spinner } from 'react-bootstrap';
-import { Folder, FileEarmark, ArrowUp, Check2 } from 'react-bootstrap-icons';
-import styled from 'styled-components';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ArrowUp, Check, FileText, Folder, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 import { GitHubContentItem } from '../../services/github/useGitHubStorage';
 
-const FileItem = styled(ListGroup.Item)`
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  &:hover {
-    background-color: var(--apollon-background-secondary, #f8f9fa);
-  }
-  
-  &.selected {
-    background-color: var(--apollon-primary-light, #e7f1ff);
-    border-color: var(--apollon-primary, #0d6efd);
-  }
-`;
-
-const FileIcon = styled.div`
-  margin-right: 10px;
-  color: var(--apollon-text-secondary, #6c757d);
-`;
-
-const FileName = styled.div`
-  flex: 1;
-`;
-
 interface FileBrowserModalProps {
-    show: boolean;
-    onHide: () => void;
-    onSelect: (path: string) => void;
-    fetchContents: (path: string) => Promise<GitHubContentItem[]>;
-    title?: string;
-    selectMode?: 'file' | 'dir'; // What can be selected
-    initialPath?: string;
+  show: boolean;
+  onHide: () => void;
+  onSelect: (path: string) => void;
+  fetchContents: (path: string) => Promise<GitHubContentItem[]>;
+  title?: string;
+  selectMode?: 'file' | 'dir';
+  initialPath?: string;
 }
 
+const itemSorter = (a: GitHubContentItem, b: GitHubContentItem): number => {
+  if (a.type === b.type) {
+    return a.name.localeCompare(b.name);
+  }
+  return a.type === 'dir' ? -1 : 1;
+};
+
 export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
-    show,
-    onHide,
-    onSelect,
-    fetchContents,
-    title = 'Select File',
-    selectMode = 'file',
-    initialPath = '',
+  show,
+  onHide,
+  onSelect,
+  fetchContents,
+  title = 'Select File',
+  selectMode = 'file',
+  initialPath = '',
 }) => {
-    const [currentPath, setCurrentPath] = useState(initialPath);
-    const [contents, setContents] = useState<GitHubContentItem[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [selectedItem, setSelectedItem] = useState<GitHubContentItem | null>(null);
-    const [error, setError] = useState<string | null>(null);
+  const [currentPath, setCurrentPath] = useState(initialPath);
+  const [contents, setContents] = useState<GitHubContentItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<GitHubContentItem | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-    // Reset state when modal opens
-    useEffect(() => {
-        if (show) {
-            setCurrentPath(initialPath);
-            setSelectedItem(null);
-            loadContents(initialPath);
-        }
-    }, [show, initialPath]);
+  const pathSegments = useMemo(() => {
+    if (!currentPath) {
+      return [] as string[];
+    }
+    return currentPath.split('/').filter(Boolean);
+  }, [currentPath]);
 
-    const loadContents = async (path: string) => {
-        setLoading(true);
-        setError(null);
-        try {
-            const items = await fetchContents(path);
-            setContents(items);
-        } catch (err) {
-            setError('Failed to load directory contents');
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
+  const loadContents = async (path: string) => {
+    setLoading(true);
+    setError(null);
 
-    const handleItemClick = (item: GitHubContentItem) => {
-        if (item.type === 'dir') {
-            // If selecting directories, we can select this
-            if (selectMode === 'dir') {
-                setSelectedItem(item);
-            }
-            // But clicking usually means "enter directory"
-            // We'll use double click or a separate button to enter? 
-            // Standard behavior: click to select, double click to enter.
-            // For now: click enters directory immediately if it's a dir, unless we are in dir selection mode?
-            // Let's make it: Click enters directory. To select a directory, you navigate INTO it and click "Select Current Folder" or similar?
-            // Or: Click selects, Double click enters.
+    try {
+      const items = await fetchContents(path);
+      setContents([...items].sort(itemSorter));
+    } catch (err) {
+      setError('Failed to load directory contents');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-            // Let's go with: Click enters directory.
-            setCurrentPath(item.path);
-            loadContents(item.path);
-            setSelectedItem(null); // Deselect when changing dir
-        } else {
-            // It's a file
-            if (selectMode === 'file') {
-                setSelectedItem(item);
-            }
-        }
-    };
+  useEffect(() => {
+    if (!show) {
+      return;
+    }
 
-    const handleNavigateUp = () => {
-        if (!currentPath) return;
-        const parts = currentPath.split('/');
-        parts.pop();
-        const newPath = parts.join('/');
-        setCurrentPath(newPath);
-        loadContents(newPath);
-        setSelectedItem(null);
-    };
+    setCurrentPath(initialPath);
+    setSelectedItem(null);
+    void loadContents(initialPath);
+  }, [show, initialPath]);
 
-    const handleBreadcrumbClick = (index: number) => {
-        if (!currentPath) return;
-        const parts = currentPath.split('/');
-        const newPath = parts.slice(0, index + 1).join('/');
-        setCurrentPath(newPath);
-        loadContents(newPath);
-        setSelectedItem(null);
-    };
+  const openPath = (path: string) => {
+    setCurrentPath(path);
+    setSelectedItem(null);
+    void loadContents(path);
+  };
 
-    const handleConfirm = () => {
-        if (selectMode === 'file' && selectedItem) {
-            onSelect(selectedItem.path);
-            onHide();
-        } else if (selectMode === 'dir') {
-            // If we are selecting a directory, we return the current path
-            onSelect(currentPath);
-            onHide();
-        }
-    };
+  const handleItemClick = (item: GitHubContentItem) => {
+    if (item.type === 'dir') {
+      if (selectMode === 'dir') {
+        setSelectedItem(item);
+      }
+      openPath(item.path);
+      return;
+    }
 
-    // Breadcrumbs generation
-    const renderBreadcrumbs = () => {
-        const parts = currentPath ? currentPath.split('/') : [];
-        return (
-            <Breadcrumb className="mb-2" style={{ fontSize: '0.9rem' }}>
-                <Breadcrumb.Item
-                    active={parts.length === 0}
-                    onClick={() => {
-                        if (parts.length > 0) {
-                            setCurrentPath('');
-                            loadContents('');
-                            setSelectedItem(null);
-                        }
-                    }}
+    if (selectMode === 'file') {
+      setSelectedItem(item);
+    }
+  };
+
+  const handleNavigateUp = () => {
+    if (!currentPath) {
+      return;
+    }
+
+    const parts = currentPath.split('/');
+    parts.pop();
+    openPath(parts.join('/'));
+  };
+
+  const handleBreadcrumbClick = (index: number) => {
+    if (!pathSegments.length) {
+      return;
+    }
+
+    const newPath = pathSegments.slice(0, index + 1).join('/');
+    openPath(newPath);
+  };
+
+  const handleConfirm = () => {
+    if (selectMode === 'file' && selectedItem) {
+      onSelect(selectedItem.path);
+      onHide();
+      return;
+    }
+
+    if (selectMode === 'dir') {
+      onSelect(currentPath);
+      onHide();
+    }
+  };
+
+  return (
+    <Dialog open={show} onOpenChange={(open) => !open && onHide()}>
+      <DialogContent className="max-h-[86vh] overflow-hidden sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-1 rounded-md border border-border/70 bg-muted/40 px-2 py-1.5 text-xs">
+            <button
+              type="button"
+              onClick={() => openPath('')}
+              className={cn(
+                'rounded px-2 py-1 transition-colors hover:bg-accent',
+                !pathSegments.length && 'bg-accent text-accent-foreground',
+              )}
+            >
+              root
+            </button>
+            {pathSegments.map((segment, index) => (
+              <React.Fragment key={`${segment}-${index}`}>
+                <span className="text-muted-foreground">/</span>
+                <button
+                  type="button"
+                  onClick={() => handleBreadcrumbClick(index)}
+                  className={cn(
+                    'rounded px-2 py-1 transition-colors hover:bg-accent',
+                    index === pathSegments.length - 1 && 'bg-accent text-accent-foreground',
+                  )}
                 >
-                    root
-                </Breadcrumb.Item>
-                {parts.map((part, index) => (
-                    <Breadcrumb.Item
-                        key={index}
-                        active={index === parts.length - 1}
-                        onClick={() => handleBreadcrumbClick(index)}
-                    >
-                        {part}
-                    </Breadcrumb.Item>
-                ))}
-            </Breadcrumb>
-        );
-    };
+                  {segment}
+                </button>
+              </React.Fragment>
+            ))}
+          </div>
 
-    return (
-        <Modal show={show} onHide={onHide} size="lg">
-            <Modal.Header closeButton>
-                <Modal.Title>{title}</Modal.Title>
-            </Modal.Header>
-            <Modal.Body>
-                {renderBreadcrumbs()}
+          {currentPath && (
+            <Button variant="outline" size="sm" onClick={handleNavigateUp} className="gap-1">
+              <ArrowUp className="h-4 w-4" />
+              Up one level
+            </Button>
+          )}
 
-                {currentPath && (
-                    <div className="mb-2">
-                        <Button
-                            variant="light"
-                            size="sm"
-                            onClick={handleNavigateUp}
-                            className="text-muted"
-                        >
-                            <ArrowUp size={14} className="me-1" /> Up one level
-                        </Button>
-                    </div>
-                )}
+          <div
+            className="h-80 overflow-y-scroll rounded-md border border-border/70 bg-background [scrollbar-gutter:stable]"
+            style={{ scrollbarWidth: 'thin' }}
+          >
+            {loading ? (
+              <div className="flex h-full items-center justify-center text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+              </div>
+            ) : error ? (
+              <div className="p-4 text-center text-sm text-destructive">{error}</div>
+            ) : contents.length === 0 ? (
+              <div className="p-4 text-center text-sm text-muted-foreground">Empty directory</div>
+            ) : (
+              <ul className="divide-y divide-border/60">
+                {contents.map((item) => {
+                  const selected = selectedItem?.sha === item.sha;
 
-                <div style={{ height: '300px', overflowY: 'auto', border: '1px solid #dee2e6', borderRadius: '4px' }}>
-                    {loading ? (
-                        <div className="d-flex justify-content-center align-items-center h-100">
-                            <Spinner animation="border" size="sm" />
-                        </div>
-                    ) : error ? (
-                        <div className="text-danger p-3 text-center">{error}</div>
-                    ) : contents.length === 0 ? (
-                        <div className="text-muted p-3 text-center">Empty directory</div>
-                    ) : (
-                        <ListGroup variant="flush">
-                            {contents.map((item) => (
-                                <FileItem
-                                    key={item.sha}
-                                    className={selectedItem?.sha === item.sha ? 'selected' : ''}
-                                    onClick={() => handleItemClick(item)}
-                                >
-                                    <FileIcon>
-                                        {item.type === 'dir' ? <Folder /> : <FileEarmark />}
-                                    </FileIcon>
-                                    <FileName>{item.name}</FileName>
-                                    {selectedItem?.sha === item.sha && <Check2 className="text-primary" />}
-                                </FileItem>
-                            ))}
-                        </ListGroup>
-                    )}
-                </div>
+                  return (
+                    <li key={item.sha}>
+                      <button
+                        type="button"
+                        onClick={() => handleItemClick(item)}
+                        className={cn(
+                          'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted/50',
+                          selected && 'bg-primary/10 text-foreground',
+                        )}
+                      >
+                        {item.type === 'dir' ? (
+                          <Folder className="h-4 w-4 shrink-0 text-amber-600" />
+                        ) : (
+                          <FileText className="h-4 w-4 shrink-0 text-slate-500" />
+                        )}
+                        <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                        {selected && <Check className="h-4 w-4 text-primary" />}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
 
-                {selectMode === 'dir' && (
-                    <div className="mt-2 text-muted small">
-                        Navigate to the folder you want to select and click "Select Current Folder".
-                    </div>
-                )}
-            </Modal.Body>
-            <Modal.Footer>
-                <Button variant="secondary" onClick={onHide}>
-                    Cancel
-                </Button>
-                <Button
-                    variant="primary"
-                    onClick={handleConfirm}
-                    disabled={selectMode === 'file' && !selectedItem}
-                >
-                    {selectMode === 'dir' ? 'Select Current Folder' : 'Select File'}
-                </Button>
-            </Modal.Footer>
-        </Modal>
-    );
+          {selectMode === 'dir' && (
+            <p className="text-xs text-muted-foreground">
+              Navigate to the target folder, then click "Select Current Folder".
+            </p>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onHide}>
+            Cancel
+          </Button>
+          <Button onClick={handleConfirm} disabled={selectMode === 'file' && !selectedItem}>
+            {selectMode === 'dir' ? 'Select Current Folder' : 'Select File'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 };

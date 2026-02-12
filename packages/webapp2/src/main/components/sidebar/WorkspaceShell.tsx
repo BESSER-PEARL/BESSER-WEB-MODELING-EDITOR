@@ -494,7 +494,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
         onToggleTheme={handleToggleTheme}
         onGitHubLogin={githubLogin}
         onGitHubLogout={githubLogout}
-        onOpenGitHubSidebar={() => setIsGitHubSidebarOpen(true)}
+        onOpenGitHubSidebar={() => setIsGitHubSidebarOpen((previous) => !previous)}
         onOpenDeployDialog={handleOpenDeployDialog}
         onOpenHelpDialog={() => setIsHelpDialogOpen(true)}
         onOpenAboutDialog={() => setIsAboutDialogOpen(true)}
