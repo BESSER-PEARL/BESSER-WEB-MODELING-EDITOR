@@ -2,10 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { UMLDiagramType } from '@besser/wme';
 import { toast } from 'react-toastify';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useProject } from '../../hooks/useProject';
 import { toUMLDiagramType } from '../../types/project';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -30,10 +26,16 @@ import { FeedbackDialog } from '../modals/FeedbackDialog';
 import { HelpGuideDialog } from '../modals/HelpGuideDialog';
 import { WorkspaceTopBar } from '../application-bar/WorkspaceTopBar';
 import { WorkspaceSidebar } from './WorkspaceSidebar';
+import {
+  AboutDialog,
+  AssistantImportDialog,
+  type AssistantImportMode,
+  DeployDialog,
+  DeployResultDialog,
+} from './dialogs';
 import type { GeneratorMenuMode, GeneratorType } from './workspace-types';
 
 export type { GeneratorType, GeneratorMenuMode } from './workspace-types';
-type AssistantImportMode = 'image' | 'kg' | null;
 
 interface WorkspaceShellProps {
   children: React.ReactNode;
@@ -532,60 +534,22 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
         />
       </div>
 
-      <Dialog open={assistantImportMode !== null} onOpenChange={(open) => !open && resetAssistantImportDialog()}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              {assistantImportMode === 'image'
-                ? 'Import Class Diagram from Image'
-                : 'Import Class Diagram from Knowledge Graph'}
-            </DialogTitle>
-            <DialogDescription>
-              Use an OpenAI API key to convert your file to a class diagram and add it to the current project.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="assistant-import-api-key">OpenAI API Key</Label>
-              <Input
-                id="assistant-import-api-key"
-                type="password"
-                value={assistantApiKey}
-                onChange={(event) => setAssistantApiKey(event.target.value)}
-                placeholder="sk-..."
-                autoComplete="off"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="assistant-import-file">
-                {assistantImportMode === 'image'
-                  ? 'Upload Diagram Image (PNG/JPEG)'
-                  : 'Upload Knowledge Graph (TTL/RDF/JSON)'}
-              </Label>
-              <input
-                id="assistant-import-file"
-                type="file"
-                accept={assistantImportMode === 'image' ? 'image/png, image/jpeg' : '.ttl,.rdf,.json'}
-                onChange={handleAssistantFileChange}
-                className="block w-full cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
-              />
-              {assistantImportError && <p className="text-xs text-red-600">{assistantImportError}</p>}
-              {assistantSelectedFile && <p className="text-xs text-slate-600">Selected: {assistantSelectedFile.name}</p>}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={resetAssistantImportDialog} disabled={isAssistantImporting}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleAssistantImport}
-              disabled={!assistantApiKey || !assistantSelectedFile || !!assistantImportError || isAssistantImporting}
-            >
-              {isAssistantImporting ? 'Importing...' : 'Import'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AssistantImportDialog
+        open={assistantImportMode !== null}
+        mode={assistantImportMode}
+        apiKey={assistantApiKey}
+        selectedFile={assistantSelectedFile}
+        error={assistantImportError}
+        isImporting={isAssistantImporting}
+        onOpenChange={(open) => {
+          if (!open) {
+            resetAssistantImportDialog();
+          }
+        }}
+        onApiKeyChange={setAssistantApiKey}
+        onFileChange={handleAssistantFileChange}
+        onImport={() => void handleAssistantImport()}
+      />
 
       <JsonViewerModal
         isVisible={isProjectPreviewOpen}
@@ -613,112 +577,35 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
         onOpenRepository={() => openExternalUrl(besserWMERepositoryLink)}
       />
 
-      <Dialog open={isDeployDialogOpen} onOpenChange={setIsDeployDialogOpen}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Publish to Render</DialogTitle>
-            <DialogDescription>
-              Create a GitHub repository from the current project and deploy it on Render.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="deploy-repo-name">Repository Name</Label>
-              <Input
-                id="deploy-repo-name"
-                value={githubRepoName}
-                onChange={(event) => setGithubRepoName(event.target.value)}
-                placeholder="my-awesome-app"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="deploy-repo-description">Description</Label>
-              <Input
-                id="deploy-repo-description"
-                value={githubRepoDescription}
-                onChange={(event) => setGithubRepoDescription(event.target.value)}
-                placeholder="Web application generated by BESSER"
-              />
-            </div>
-            <label className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm">
-              Make repository private
-              <input
-                type="checkbox"
-                checked={githubRepoPrivate}
-                onChange={(event) => setGithubRepoPrivate(event.target.checked)}
-              />
-            </label>
-            {githubRepoPrivate && (
-              <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Private repositories may require manual Render permission setup.
-              </p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeployDialogOpen(false)} disabled={isDeployingToRender}>
-              Cancel
-            </Button>
-            <Button onClick={handlePublishToRender} disabled={isDeployingToRender || !githubRepoName.trim()}>
-              {isDeployingToRender ? 'Publishing...' : 'Publish to Render'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeployDialog
+        open={isDeployDialogOpen}
+        isDeploying={isDeployingToRender}
+        repoName={githubRepoName}
+        repoDescription={githubRepoDescription}
+        repoPrivate={githubRepoPrivate}
+        onOpenChange={setIsDeployDialogOpen}
+        onRepoNameChange={setGithubRepoName}
+        onRepoDescriptionChange={setGithubRepoDescription}
+        onRepoPrivateChange={setGithubRepoPrivate}
+        onPublish={() => void handlePublishToRender()}
+      />
 
-      <Dialog open={isDeployResultOpen} onOpenChange={setIsDeployResultOpen}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Repository Created Successfully</DialogTitle>
-            <DialogDescription>
-              Continue with one-click Render deployment or inspect the generated repository.
-            </DialogDescription>
-          </DialogHeader>
-          {deploymentResult && (
-            <div className="space-y-4">
-              <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-                <p className="font-medium">
-                  {deploymentResult.owner}/{deploymentResult.repo_name}
-                </p>
-                <p className="text-xs">{deploymentResult.files_uploaded} files uploaded.</p>
-              </div>
-              <Button className="w-full" onClick={() => openExternalUrl(deploymentResult.deployment_urls.render)}>
-                Open Render Deployment
-              </Button>
-              <Button variant="outline" className="w-full" onClick={() => openExternalUrl(deploymentResult.repo_url)}>
-                View GitHub Repository
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <DeployResultDialog
+        open={isDeployResultOpen}
+        deploymentResult={deploymentResult}
+        onOpenChange={setIsDeployResultOpen}
+        onOpenRender={() => deploymentResult && openExternalUrl(deploymentResult.deployment_urls.render)}
+        onOpenRepository={() => deploymentResult && openExternalUrl(deploymentResult.repo_url)}
+      />
 
-      <Dialog open={isAboutDialogOpen} onOpenChange={setIsAboutDialogOpen}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>About BESSER</DialogTitle>
-            <DialogDescription>Runtime versions and project resources.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 text-sm text-slate-700">
-            <p>
-              <span className="font-semibold">Web Editor:</span> {appVersion}
-            </p>
-            <p>
-              <span className="font-semibold">BESSER Library:</span> {besserLibraryVersion}
-            </p>
-            <p className="pt-1 text-xs text-slate-600">
-              BESSER provides model-driven engineering tooling for UML-based design, code generation, and deployment.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => openExternalUrl(besserWMERepositoryLink)}>
-              WME Repository
-            </Button>
-            <Button variant="outline" onClick={() => openExternalUrl(besserLibraryRepositoryLink)}>
-              Library Repository
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AboutDialog
+        open={isAboutDialogOpen}
+        appVersion={appVersion}
+        libraryVersion={besserLibraryVersion}
+        onOpenChange={setIsAboutDialogOpen}
+        onOpenWmeRepository={() => openExternalUrl(besserWMERepositoryLink)}
+        onOpenLibraryRepository={() => openExternalUrl(besserLibraryRepositoryLink)}
+      />
     </div>
   );
 };

@@ -31,7 +31,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { useGitHubAuth } from '../../services/github/useGitHubAuth';
 import {
@@ -45,6 +44,7 @@ import { useProject } from '../../hooks/useProject';
 import { ProjectStorageRepository } from '../../services/storage/ProjectStorageRepository';
 import { toast } from 'react-toastify';
 import { FileBrowserModal } from './FileBrowserModal';
+import { CommitDialog, CreateGistDialog, CreateRepositoryDialog, RestoreVersionDialog } from './dialogs';
 import { ApollonEditorContext } from '../apollon-editor-component/apollon-editor-context';
 import { BesserProject } from '../../types/project';
 
@@ -1160,208 +1160,56 @@ export const GitHubSidebar: React.FC<GitHubSidebarProps> = ({ isOpen, onClose })
         initialPath={linkFolderPath}
       />
 
-      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Create Repository</DialogTitle>
-            <DialogDescription>Create a new GitHub repository and push the current project.</DialogDescription>
-          </DialogHeader>
+      <CreateRepositoryDialog
+        open={showCreateModal}
+        isLoading={isLoading}
+        repoName={newRepoName}
+        repoDescription={newRepoDescription}
+        isRepoPrivate={isRepoPrivate}
+        fileName={createFileName}
+        folderPath={createFolderPath}
+        onOpenChange={setShowCreateModal}
+        onRepoNameChange={(value) => setNewRepoName(sanitizeRepoName(value))}
+        onRepoDescriptionChange={setNewRepoDescription}
+        onRepoPrivateChange={setIsRepoPrivate}
+        onFileNameChange={(value) => setCreateFileName(value.replace(/\s+/g, '_'))}
+        onFolderPathChange={setCreateFolderPath}
+        onCreate={() => void handleCreateRepo()}
+      />
 
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Repository Name</Label>
-              <Input
-                placeholder="my-project"
-                value={newRepoName}
-                onChange={(event) => setNewRepoName(sanitizeRepoName(event.target.value))}
-              />
-              <p className="text-xs text-muted-foreground">
-                Only lowercase letters, numbers, dashes, and underscores are allowed.
-              </p>
-            </div>
+      <CommitDialog
+        open={showCommitModal}
+        isSaving={isSaving}
+        message={commitMessage}
+        onOpenChange={setShowCommitModal}
+        onMessageChange={setCommitMessage}
+        onCommit={() => void handleConfirmSave()}
+      />
 
-            <div className="space-y-1.5">
-              <Label>Description</Label>
-              <Textarea
-                rows={2}
-                placeholder="Optional description..."
-                value={newRepoDescription}
-                onChange={(event) => setNewRepoDescription(event.target.value)}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Folder Path (optional)</Label>
-              <Input
-                placeholder="e.g., projects/my-models"
-                value={createFolderPath}
-                onChange={(event) => setCreateFolderPath(event.target.value)}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>File Name</Label>
-              <Input
-                placeholder="my_project.json"
-                value={createFileName}
-                onChange={(event) => setCreateFileName(event.target.value.replace(/\s+/g, '_'))}
-              />
-            </div>
-
-            <div className="rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-xs">
-              <span className="font-semibold">Full path:</span>{' '}
-              <code>
-                /
-                {createFolderPath
-                  ? `${createFolderPath.replace(/^\/+|\/+$/g, '')}/${createFileName}`
-                  : createFileName}
-              </code>
-            </div>
-
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={isRepoPrivate}
-                onChange={(event) => setIsRepoPrivate(event.target.checked)}
-                className="h-4 w-4 rounded border-border"
-              />
-              Private repository
-            </label>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateModal(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => void handleCreateRepo()} disabled={isLoading || !newRepoName.trim() || !createFileName.trim()}>
-              {isLoading ? spinner : 'Create'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showCommitModal} onOpenChange={setShowCommitModal}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Push to GitHub</DialogTitle>
-            <DialogDescription>Write a commit message for your changes.</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-1.5">
-            <Label>Commit Message</Label>
-            <Textarea
-              rows={2}
-              placeholder="Describe your changes..."
-              value={commitMessage}
-              onChange={(event) => setCommitMessage(event.target.value)}
-              autoFocus
-            />
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCommitModal(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => void handleConfirmSave()} disabled={isSaving || !commitMessage.trim()} className="gap-2">
-              {isSaving ? spinner : <CloudUpload className="h-4 w-4" />}
-              Push
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
+      <RestoreVersionDialog
         open={showRestoreModal}
+        isSaving={isSaving}
+        selectedCommit={selectedCommit}
+        formatDate={formatDate}
         onOpenChange={(open) => {
           setShowRestoreModal(open);
           if (!open) {
             setSelectedCommit(null);
           }
         }}
-      >
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Restore Version</DialogTitle>
-            <DialogDescription>
-              Your current unsaved changes will be lost. Consider pushing your current work first.
-            </DialogDescription>
-          </DialogHeader>
+        onRestore={() => void handleRestoreCommit()}
+      />
 
-          {selectedCommit && (
-            <div className="rounded-md border border-border/70 bg-muted/30 px-3 py-2">
-              <p className="text-sm font-semibold">{selectedCommit.message}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {selectedCommit.author} - {formatDate(selectedCommit.date)}
-              </p>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            <AlertTriangle className="h-4 w-4" />
-            Restore this commit?
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowRestoreModal(false);
-                setSelectedCommit(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button onClick={() => void handleRestoreCommit()} disabled={isSaving} className="gap-2">
-              {isSaving ? spinner : null}
-              Restore This Version
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showGistModal} onOpenChange={setShowGistModal}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Create Gist</DialogTitle>
-            <DialogDescription>Create a GitHub Gist to quickly share your project.</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Description</Label>
-              <Textarea
-                rows={2}
-                placeholder="Gist description..."
-                value={gistDescription}
-                onChange={(event) => setGistDescription(event.target.value)}
-              />
-            </div>
-
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={isGistPublic}
-                onChange={(event) => setIsGistPublic(event.target.checked)}
-                className="h-4 w-4 rounded border-border"
-              />
-              Public Gist
-            </label>
-
-            <p className="text-xs text-muted-foreground">
-              Secret gists are hidden from search engines but visible to anyone with the link.
-            </p>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowGistModal(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => void handleCreateGist()} disabled={isLoading}>
-              {isLoading ? spinner : 'Create Gist'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CreateGistDialog
+        open={showGistModal}
+        isLoading={isLoading}
+        description={gistDescription}
+        isPublic={isGistPublic}
+        onOpenChange={setShowGistModal}
+        onDescriptionChange={setGistDescription}
+        onPublicChange={setIsGistPublic}
+        onCreate={() => void handleCreateGist()}
+      />
     </>
   );
 };
