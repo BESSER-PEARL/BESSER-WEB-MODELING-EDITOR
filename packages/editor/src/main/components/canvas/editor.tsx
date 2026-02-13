@@ -120,7 +120,7 @@ class EditorComponent extends Component<Props, State> {
   }
 
   render() {
-    const { moving, connecting, reconnecting, scale = 1.0, ...props } = this.props;
+    const { moving, connecting, reconnecting, scale = 1.0, move, setZoomFactor, ...props } = this.props;
 
     if (this.state.isMobile) {
       return (
