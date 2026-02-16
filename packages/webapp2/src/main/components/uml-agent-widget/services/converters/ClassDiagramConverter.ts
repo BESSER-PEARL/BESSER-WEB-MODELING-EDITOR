@@ -69,8 +69,8 @@ export class ClassDiagramConverter implements DiagramConverter {
     const allRelationships: Record<string, any> = {};
     const classIdMap: Record<string, string> = {};
     
-    systemSpec.classes?.forEach((classSpec: any, index: number) => {
-      const position = this.positionGenerator.getNextPosition(index);
+    systemSpec.classes?.forEach((classSpec: any) => {
+      const position = classSpec.position || this.positionGenerator.getNextPosition();
       const completeElement = this.convertSingleElement(classSpec, position);
       classIdMap[classSpec.className] = completeElement.class.id;
       
@@ -92,14 +92,14 @@ export class ClassDiagramConverter implements DiagramConverter {
           type: relationshipType,
           source: { 
             element: sourceId,
-            direction: 'Left',
+            direction: rel.sourceDirection || 'Left',
             multiplicity: rel.sourceMultiplicity || '1',
             role: '',
             bounds: { x: 0, y: 0, width: 0, height: 0 }
           },
           target: { 
             element: targetId,
-            direction: 'Right',
+            direction: rel.targetDirection || 'Right',
             multiplicity: rel.targetMultiplicity || '1',
             role: rel.name || '',
             bounds: { x: 0, y: 0, width: 0, height: 0 }

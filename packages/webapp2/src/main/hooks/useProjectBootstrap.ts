@@ -1,4 +1,4 @@
-import { Dispatch, SetStateAction, useEffect, useState } from 'react';
+import { Dispatch, SetStateAction, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { localStorageLatestProject } from '../constant';
 import { useGitHubBumlImport } from '../services/import/useGitHubBumlImport';
@@ -24,6 +24,7 @@ export const useProjectBootstrap = ({
 }: UseProjectBootstrapOptions): UseProjectBootstrapResult => {
   const [showProjectHub, setShowProjectHub] = useState(false);
   const [hasCheckedForProject, setHasCheckedForProject] = useState(false);
+  const bootstrapStartedRef = useRef(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const { importFromGitHub, isLoading: isGitHubImportLoading } = useGitHubBumlImport();
   const hasTokenInUrl = !KNOWN_ROUTES.includes(pathname);
@@ -33,6 +34,10 @@ export const useProjectBootstrap = ({
       if (hasCheckedForProject) {
         return;
       }
+      if (bootstrapStartedRef.current) {
+        return;
+      }
+      bootstrapStartedRef.current = true;
 
       if (hasTokenInUrl) {
         setShowProjectHub(false);

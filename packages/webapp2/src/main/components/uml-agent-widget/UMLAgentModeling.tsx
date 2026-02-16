@@ -1,9 +1,11 @@
 import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { UMLDiagramType } from '@besser/wme';
 import { CircleHelp, Download, X, Zap } from 'lucide-react';
 import posthog from 'posthog-js';
 import { ApollonEditorContext } from '../apollon-editor-component/apollon-editor-context';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { useProject } from '../../hooks/useProject';
 import {
   UMLModelingService,
   ClassSpec,
@@ -12,12 +14,12 @@ import {
   BESSERModel,
   ModelUpdate,
 } from './services/UMLModelingService';
-import { WebSocketService, ChatMessage, InjectionCommand, SendStatus } from './services/WebSocketService';
+import { WebSocketService, ChatMessage, InjectionCommand, SendStatus, AssistantActionPayload } from './services/WebSocketService';
 import { UIService } from './services/UIService';
 import { RateLimiterService, RateLimitStatus } from './services/RateLimiterService';
 import { JsonViewerModal } from '../modals/json-viewer-modal/json-viewer-modal';
 import { UML_BOT_WS_URL } from '../../constant';
-import { isUMLModel } from '../../types/project';
+import { isUMLModel, toUMLDiagramType } from '../../types/project';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -27,10 +29,16 @@ import { cn } from '@/lib/utils';
 import { MessageInput } from '@/components/chatbot-kit/ui/message-input';
 import { MessageList } from '@/components/chatbot-kit/ui/message-list';
 import type { Message as KitMessage } from '@/components/chatbot-kit/ui/chat-message';
+import type { GeneratorType } from '../sidebar/workspace-types';
+import type { GenerationResult } from '../../services/generate-code/types';
 
 type ConnectionStatus = 'connected' | 'connecting' | 'disconnected' | 'closed' | 'closing' | 'unknown';
 
 const AGENT_AVATAR_SRC = '/img/agent_back.png';
+
+interface UMLAgentModelingProps {
+  onAssistantGenerate?: (type: GeneratorType, config?: unknown) => Promise<GenerationResult>;
+}
 
 const getConnectionLabel = (status: ConnectionStatus): string => {
   switch (status) {
@@ -74,7 +82,7 @@ const getRateLimitClass = (requestsLastMinute: number): string => {
  * UML Bot Widget migrated to Webapp2 styling conventions.
  * Uses Tailwind/shadcn for visuals while preserving existing agent logic/services.
  */
-export const UMLAgentModeling: React.FC = () => {
+export const UMLAgentModeling: React.FC<UMLAgentModelingProps> = ({ onAssistantGenerate }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -104,9 +112,11 @@ export const UMLAgentModeling: React.FC = () => {
   const [modelingService, setModelingService] = useState<UMLModelingService | null>(null);
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const operationQueueRef = useRef<Promise<void>>(Promise.resolve());
   const { editor } = useContext(ApollonEditorContext);
   const dispatch = useAppDispatch();
   const currentDiagram = useAppSelector((state) => state.diagram);
+  const { switchDiagramType, currentProject } = useProject();
   const location = useLocation();
 
   const isOnDiagramPage = location.pathname === '/';
@@ -172,6 +182,48 @@ export const UMLAgentModeling: React.FC = () => {
       return;
     }
 
+    const waitForDiagramRender = async (): Promise<void> => {
+      await new Promise<void>((resolve) => {
+        if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+          setTimeout(resolve, 0);
+          return;
+        }
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => resolve());
+        });
+      });
+    };
+
+    const ensureDiagramReady = async (diagramType?: string): Promise<boolean> => {
+      if (!diagramType || diagramType === currentDiagramType) {
+        return true;
+      }
+
+      const umlType = toUMLDiagramType(diagramType as any);
+      if (!umlType) {
+        return false;
+      }
+
+      try {
+        switchDiagramType(umlType as UMLDiagramType);
+        await waitForDiagramRender();
+        setCurrentDiagramType(diagramType);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const enqueueAssistantTask = (task: () => Promise<void> | void) => {
+      operationQueueRef.current = operationQueueRef.current
+        .then(async () => {
+          await task();
+        })
+        .catch((error) => {
+          console.error('Widget assistant task queue error:', error);
+        });
+    };
+
     const handleMessage = (message: ChatMessage) => {
       setMessages((prev) => [...prev, message]);
     };
@@ -190,13 +242,79 @@ export const UMLAgentModeling: React.FC = () => {
       setIsTyping(typing);
     };
 
+    const handleAction = async (payload: AssistantActionPayload) => {
+      if (payload.action === 'switch_diagram') {
+        const diagramType = typeof payload.diagramType === 'string' ? payload.diagramType : '';
+        const umlType = diagramType ? toUMLDiagramType(diagramType as any) : null;
+        if (!umlType) {
+          return;
+        }
+        try {
+          const switched = await ensureDiagramReady(diagramType);
+          if (!switched) {
+            throw new Error(`Could not switch to ${diagramType}`);
+          }
+          if (typeof payload.reason === 'string' && payload.reason.trim()) {
+            const infoMessage: ChatMessage = {
+              id: uiService.generateId('msg'),
+              action: 'assistant_message',
+              message: payload.reason,
+              isUser: false,
+              timestamp: new Date(),
+            };
+            setMessages((previous) => [...previous, infoMessage]);
+          }
+        } catch (error) {
+          uiService.showToast('Failed to switch diagram', 'error');
+        }
+        return;
+      }
+
+      if (payload.action === 'trigger_generator') {
+        if (!onAssistantGenerate || typeof payload.generatorType !== 'string') {
+          return;
+        }
+
+        const result = await onAssistantGenerate(payload.generatorType as GeneratorType, payload.config);
+        wsService.sendFrontendEvent('generator_result', {
+          ok: result.ok,
+          message:
+            typeof payload.message === 'string' && payload.message.trim()
+              ? payload.message
+              : result.ok
+                ? 'Generation completed successfully.'
+                : result.error,
+          metadata: result.ok && result.filename ? { filename: result.filename } : undefined,
+        });
+        return;
+      }
+
+      if (payload.action === 'agent_error') {
+        const message = typeof payload.message === 'string' ? payload.message : 'Assistant error';
+        const errorMessage: ChatMessage = {
+          id: uiService.generateId('msg'),
+          action: 'assistant_message',
+          message: `[ERROR] ${message}`,
+          isUser: false,
+          timestamp: new Date(),
+        };
+        setMessages((previous) => [...previous, errorMessage]);
+      }
+    };
+
     const handleInjection = async (command: InjectionCommand) => {
+      console.log('[Agent WS] Injection command received:', JSON.stringify(command, null, 2));
       if (!modelingService) {
         uiService.showToast('Modeling service not ready', 'error');
         return;
       }
 
       try {
+        const diagramReady = await ensureDiagramReady(command.diagramType);
+        if (!diagramReady) {
+          throw new Error(`Could not switch to ${command.diagramType || 'target diagram'}`);
+        }
+
         let successMessage: string | undefined;
         let update: ModelUpdate | null = null;
 
@@ -268,7 +386,12 @@ export const UMLAgentModeling: React.FC = () => {
     wsService.onMessage(handleMessage);
     wsService.onConnection(handleConnection);
     wsService.onTyping(handleTyping);
-    wsService.onInjection(handleInjection);
+    wsService.onInjection((command) => {
+      enqueueAssistantTask(() => handleInjection(command));
+    });
+    wsService.onAction((payload) => {
+      enqueueAssistantTask(() => handleAction(payload));
+    });
 
     const state = wsService.connectionState as ConnectionStatus;
     setConnectionStatus(state === 'connected' ? 'connected' : 'connecting');
@@ -282,7 +405,7 @@ export const UMLAgentModeling: React.FC = () => {
     return () => {
       wsService.clearHandlers();
     };
-  }, [wsService, uiService, hasShownWelcome, modelingService, isVisible, currentDiagramType]);
+  }, [wsService, uiService, hasShownWelcome, modelingService, isVisible, currentDiagramType, onAssistantGenerate, switchDiagramType]);
 
   useEffect(() => {
     if (messagesContainerRef.current) {
@@ -319,7 +442,22 @@ export const UMLAgentModeling: React.FC = () => {
       setRateLimitStatus(status);
 
       const modelSnapshot = modelingService?.getCurrentModel();
-      const sendResult: SendStatus = wsService.sendMessage(inputValue, currentDiagramType, modelSnapshot);
+      const activeDiagram = currentProject?.diagrams?.[currentDiagramType as keyof typeof currentProject.diagrams];
+      const diagramSummaries = currentProject
+        ? Object.entries(currentProject.diagrams).map(([diagramType, diagram]) => ({
+            diagramType,
+            diagramId: diagram.id,
+            title: diagram.title,
+          }))
+        : [];
+
+      const sendResult: SendStatus = wsService.sendMessage(inputValue, currentDiagramType, modelSnapshot, {
+        activeDiagramType: currentDiagramType,
+        activeDiagramId: activeDiagram?.id,
+        activeModel: modelSnapshot,
+        projectSnapshot: currentProject || undefined,
+        diagramSummaries,
+      });
 
       if (sendResult === 'error') {
         uiService.showToast('Failed to send message', 'error');

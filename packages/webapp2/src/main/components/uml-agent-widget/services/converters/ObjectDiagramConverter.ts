@@ -50,8 +50,8 @@ export class ObjectDiagramConverter implements DiagramConverter {
     const allRelationships: Record<string, any> = {};
     const objectIdMap: Record<string, string> = {};
     
-    systemSpec.objects?.forEach((objectSpec: any, index: number) => {
-      const position = this.positionGenerator.getNextPosition(index);
+    systemSpec.objects?.forEach((objectSpec: any) => {
+      const position = objectSpec.position || this.positionGenerator.getNextPosition();
       const completeElement = this.convertSingleElement(objectSpec, position);
       objectIdMap[objectSpec.objectName] = completeElement.object.id;
       
@@ -71,12 +71,12 @@ export class ObjectDiagramConverter implements DiagramConverter {
           type: "ObjectLink",
           source: {
             element: sourceId,
-            direction: 'Left',
+            direction: link.sourceDirection || 'Left',
             bounds: { x: 0, y: 0, width: 0, height: 0 }
           },
           target: {
             element: targetId,
-            direction: 'Right',
+            direction: link.targetDirection || 'Right',
             bounds: { x: 0, y: 0, width: 0, height: 0 }
           },
           bounds: { x: 0, y: 0, width: 0, height: 0 },

@@ -118,8 +118,8 @@ export class StateMachineConverter implements DiagramConverter {
     const stateIdMap: Record<string, string> = {};
     
     // Create states with their bodies
-    systemSpec.states?.forEach((stateSpec: any, index: number) => {
-      const position = this.positionGenerator.getNextPosition(index);
+    systemSpec.states?.forEach((stateSpec: any) => {
+      const position = stateSpec.position || this.positionGenerator.getNextPosition();
       const completeElement = this.convertSingleElement(stateSpec, position);
       stateIdMap[stateSpec.stateName || 'initial'] = completeElement.state.id;
       
@@ -156,12 +156,12 @@ export class StateMachineConverter implements DiagramConverter {
           bounds: { x: 0, y: 0, width: 100, height: 1 },
           path: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
           source: {
-            direction: 'Right',
+            direction: transition.sourceDirection || 'Right',
             element: sourceId,
             bounds: { x: 0, y: 0, width: 0, height: 0 }
           },
           target: {
-            direction: 'Left',
+            direction: transition.targetDirection || 'Left',
             element: targetId,
             bounds: { x: 0, y: 0, width: 0, height: 0 }
           },

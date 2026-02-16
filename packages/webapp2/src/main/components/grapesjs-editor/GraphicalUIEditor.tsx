@@ -47,6 +47,39 @@ export const GraphicalUIEditor: React.FC = () => {
       // Setup all editor features
       const cleanup = setupEditorFeatures(editor, setSaveStatus, saveIntervalRef);
 
+      const handleAssistantAutoGenerate = async () => {
+        try {
+          await autoGenerateGUIFromClassDiagram(editor);
+          editor.runCommand('notifications:add', {
+            type: 'success',
+            message: '✓ GUI generated successfully from Class Diagram.',
+            group: 'Assistant Auto-Generate',
+          });
+          window.dispatchEvent(
+            new CustomEvent('wme:assistant-auto-generate-gui-done', {
+              detail: { ok: true },
+            }),
+          );
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          console.error('[Assistant Auto-Generate] Error:', error);
+          editor.runCommand('notifications:add', {
+            type: 'error',
+            message: `✗ Error generating GUI: ${message}`,
+            group: 'Assistant Auto-Generate',
+          });
+          window.dispatchEvent(
+            new CustomEvent('wme:assistant-auto-generate-gui-done', {
+              detail: { ok: false, error: message },
+            }),
+          );
+        }
+      };
+
+      window.addEventListener('wme:assistant-auto-generate-gui', handleAssistantAutoGenerate as EventListener);
+      (window as any).__WME_GUI_EDITOR_READY__ = true;
+      window.dispatchEvent(new CustomEvent('wme:gui-editor-ready'));
+
       // Register all custom components
       registerCustomComponents(editor);
 
@@ -74,6 +107,9 @@ export const GraphicalUIEditor: React.FC = () => {
         
         // Call cleanup function
         if (cleanup) cleanup();
+
+        window.removeEventListener('wme:assistant-auto-generate-gui', handleAssistantAutoGenerate as EventListener);
+        (window as any).__WME_GUI_EDITOR_READY__ = false;
         
         // Destroy editor
         if (editorRef.current) {
@@ -812,10 +848,10 @@ function addAutoGenerateGUIButton(editor: Editor) {
           confirmBtn.style.backgroundColor = '#0d6efd';
           confirmBtn.style.borderColor = '#0d6efd';
         };
-        confirmBtn.onclick = () => {
+        confirmBtn.onclick = async () => {
           modal.close();
           try {
-            autoGenerateGUIFromClassDiagram(editor);
+            await autoGenerateGUIFromClassDiagram(editor);
             // Show success notification using GrapesJS notification system
             editor.runCommand('notifications:add', {
               type: 'success',
@@ -922,14 +958,12 @@ function autoGenerateGUIFromClassDiagram(editor: Editor) {
       pages.select(createdPages[0].page);
     }
     
-    // Trigger a final save to persist all properly styled pages
-    setTimeout(() => {
-      editor.store();
-    }, 300);
+    await new Promise(resolve => setTimeout(resolve, 120));
+    editor.store();
   };
   
   // Execute the async page processing
-  processPages();
+  return processPages();
   
 }
 

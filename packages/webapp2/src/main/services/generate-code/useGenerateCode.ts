@@ -7,6 +7,7 @@ import { BACKEND_URL } from '../../constant';
 import { ProjectStorageRepository } from '../storage/ProjectStorageRepository';
 import { isGrapesJSProjectData } from '../../types/project';
 import { normalizeProjectName } from '../../utils/projectName';
+import type { GenerationResult } from './types';
 
 // Add type definitions
 export interface DjangoConfig {
@@ -53,7 +54,12 @@ export const useGenerateCode = () => {
   const downloadFile = useFileDownload();
 
   const generateCode = useCallback(
-    async (editor: ApollonEditor | null, generatorType: string, diagramTitle: string, config?: GeneratorConfig[keyof GeneratorConfig]) => {
+    async (
+      editor: ApollonEditor | null,
+      generatorType: string,
+      diagramTitle: string,
+      config?: GeneratorConfig[keyof GeneratorConfig],
+    ): Promise<GenerationResult> => {
       console.log('Starting code generation...');
 
       // For Web App generator, send the entire project (doesn't need editor)
@@ -70,14 +76,14 @@ export const useGenerateCode = () => {
       if (!editor || !editor.model) {
         console.error('No editor or model available');
         toast.error('No diagram to generate code from');
-        return;
+        return { ok: false, error: 'No diagram to generate code from' };
       }
 
       // Validate diagram before generation
       const validationResult = await validateDiagram(editor, diagramTitle);
       if (!validationResult.isValid) {
         toast.error(validationResult.message || 'Validation failed');
-        return;
+        return { ok: false, error: validationResult.message || 'Validation failed' };
       }
 
       // Prepare body for single diagram generation
@@ -104,13 +110,13 @@ export const useGenerateCode = () => {
 
           if (response.status === 400 && errorData.detail) {
             toast.error(`${errorData.detail}`);
-            return;
+            return { ok: false, error: `${errorData.detail}` };
           }
 
 
           if (response.status === 500 && errorData.detail) {
             toast.error(`${errorData.detail}`);
-            return;
+            return { ok: false, error: `${errorData.detail}` };
           }
 
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -141,6 +147,7 @@ export const useGenerateCode = () => {
 
         downloadFile({ file: blob, filename });
         toast.success('Code generation completed successfully');
+        return { ok: true, filename };
       } catch (error) {
 
         let errorMessage = 'Unknown error occurred';
@@ -149,13 +156,14 @@ export const useGenerateCode = () => {
         }
 
         toast.error(`${errorMessage}`);
+        return { ok: false, error: errorMessage };
       }
     },
     [downloadFile],
   );
 
   const generateCodeFromProject = useCallback(
-    async (generatorType: string, config?: GeneratorConfig[keyof GeneratorConfig]) => {
+    async (generatorType: string, config?: GeneratorConfig[keyof GeneratorConfig]): Promise<GenerationResult> => {
       console.log('Starting code generation from project...');
 
       // Get the current project
@@ -163,7 +171,7 @@ export const useGenerateCode = () => {
 
       if (!currentProject) {
         toast.error('No project available for code generation');
-        return;
+        return { ok: false, error: 'No project available for code generation' };
       }
 
       // Add generator and config to project settings
@@ -193,12 +201,12 @@ export const useGenerateCode = () => {
 
           if (response.status === 400 && errorData.detail) {
             toast.error(`${errorData.detail}`);
-            return;
+            return { ok: false, error: `${errorData.detail}` };
           }
 
           if (response.status === 500 && errorData.detail) {
             toast.error(`${errorData.detail}`);
-            return;
+            return { ok: false, error: `${errorData.detail}` };
           }
 
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -228,12 +236,14 @@ export const useGenerateCode = () => {
 
         downloadFile({ file: blob, filename });
         toast.success('Code generation completed successfully');
+        return { ok: true, filename };
       } catch (error) {
         let errorMessage = 'Unknown error occurred';
         if (error instanceof Error) {
           errorMessage = error.message;
         }
         toast.error(`${errorMessage}`);
+        return { ok: false, error: errorMessage };
       }
     },
     [downloadFile],

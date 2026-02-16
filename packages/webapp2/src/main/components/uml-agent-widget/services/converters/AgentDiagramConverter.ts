@@ -141,7 +141,10 @@ export class AgentDiagramConverter implements DiagramConverter {
     
     // Create initial node if specified
     if (systemSpec.hasInitialNode !== false) {
-      const initialPos = { x: -470, y: -30 };
+      const initialPos =
+        systemSpec.initialNode?.position ||
+        systemSpec.initialPosition ||
+        { x: -470, y: -30 };
       const initial = this.createInitialNode(initialPos);
       allElements[initial.initialNode.id] = initial.initialNode;
       elementIdMap['initial'] = initial.initialNode.id;
@@ -150,19 +153,21 @@ export class AgentDiagramConverter implements DiagramConverter {
     // Create intents (at top, negative Y)
     let intentX = -640;
     (systemSpec.intents || []).forEach((intentSpec: any) => {
-      const position = { x: intentX, y: -350 };
+      const position = intentSpec.position || { x: intentX, y: -350 };
       const completeElement = this.createIntent(intentSpec, position);
       elementIdMap[intentSpec.intentName || intentSpec.name] = completeElement.intent.id;
       
       allElements[completeElement.intent.id] = completeElement.intent;
       Object.assign(allElements, completeElement.bodies);
       
-      intentX += 260; // Space intents horizontally
+      if (!intentSpec.position) {
+        intentX += 260; // Space intents horizontally
+      }
     });
     
     // Create states
-    (systemSpec.states || []).forEach((stateSpec: any, index: number) => {
-      const position = this.positionGenerator.getNextPosition(index);
+    (systemSpec.states || []).forEach((stateSpec: any) => {
+      const position = stateSpec.position || this.positionGenerator.getNextPosition();
       const completeElement = this.createState(stateSpec, position);
       elementIdMap[stateSpec.stateName || stateSpec.name] = completeElement.state.id;
       

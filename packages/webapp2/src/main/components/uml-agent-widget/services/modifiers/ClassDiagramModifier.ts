@@ -33,7 +33,9 @@ export class ClassDiagramModifier implements DiagramModifier {
   canHandle(action: string): boolean {
     return [
       'modify_class',
+      'add_attribute',
       'modify_attribute',
+      'add_method',
       'modify_method',
       'add_relationship',
       'remove_element'
@@ -41,13 +43,29 @@ export class ClassDiagramModifier implements DiagramModifier {
   }
 
   applyModification(model: BESSERModel, modification: ModelModification): BESSERModel {
+    // Validate required fields before proceeding
+    if (!modification.action) {
+      throw new Error('Modification is missing required "action" field');
+    }
+    if (!modification.target || typeof modification.target !== 'object') {
+      throw new Error(`Modification "${modification.action}" is missing required "target" object`);
+    }
+    // changes is required for all actions except remove_element
+    if (modification.action !== 'remove_element' && (!modification.changes || typeof modification.changes !== 'object')) {
+      throw new Error(`Modification "${modification.action}" is missing required "changes" object`);
+    }
+
     const updatedModel = ModifierHelpers.cloneModel(model);
 
     switch (modification.action) {
       case 'modify_class':
         return this.modifyClass(updatedModel, modification);
+      case 'add_attribute':
+        return this.addAttribute(updatedModel, modification);
       case 'modify_attribute':
         return this.modifyAttribute(updatedModel, modification);
+      case 'add_method':
+        return this.addMethod(updatedModel, modification);
       case 'modify_method':
         return this.modifyMethod(updatedModel, modification);
       case 'add_relationship':
@@ -63,10 +81,119 @@ export class ClassDiagramModifier implements DiagramModifier {
     const { classId, className } = modification.target;
     const targetId = classId || this.findClassIdByName(model, className!);
 
-    if (targetId && model.elements[targetId]) {
-      if (modification.changes.name) {
-        model.elements[targetId].name = modification.changes.name;
-      }
+    if (!targetId || !model.elements[targetId]) {
+      throw new Error(`Class '${className || classId}' not found in the model.`);
+    }
+
+    const element = model.elements[targetId];
+
+    if (modification.changes.name) {
+      element.name = modification.changes.name;
+    }
+
+    // Support additional class-level properties the LLM may send
+    if (modification.changes.visibility) {
+      element.visibility = modification.changes.visibility;
+    }
+    if (typeof (modification.changes as any).isAbstract === 'boolean') {
+      element.isAbstract = (modification.changes as any).isAbstract;
+    }
+    if ((modification.changes as any).stereotype !== undefined) {
+      element.stereotype = (modification.changes as any).stereotype;
+    }
+
+    return model;
+  }
+
+  private addAttribute(model: BESSERModel, modification: ModelModification): BESSERModel {
+    const { className } = modification.target;
+    if (!className) {
+      throw new Error('add_attribute requires a target className.');
+    }
+
+    const classId = this.findClassIdByName(model, className);
+    if (!classId || !model.elements[classId]) {
+      throw new Error(`Class '${className}' not found in the model.`);
+    }
+
+    const classElement = model.elements[classId];
+    if (!classElement.attributes) {
+      classElement.attributes = [];
+    }
+
+    const attrId = ModifierHelpers.generateUniqueId('attr');
+    const visibility = modification.changes.visibility || 'public';
+    const name = modification.changes.name || 'newAttribute';
+    const type = normalizeType(modification.changes.type || 'str');
+
+    // Compute bounds: place below last existing attribute
+    const classBounds = classElement.bounds || { x: 0, y: 0, width: 220, height: 90 };
+    const existingAttrCount = classElement.attributes.length;
+    const attrY = classBounds.y + 50 + existingAttrCount * 25; // header(50) + rows
+
+    model.elements[attrId] = {
+      id: attrId,
+      name: name,
+      type: 'ClassAttribute',
+      owner: classId,
+      bounds: { x: classBounds.x + 1, y: attrY, width: (classBounds.width || 220) - 2, height: 25 },
+      visibility: visibility,
+      attributeType: type,
+    };
+
+    classElement.attributes.push(attrId);
+
+    // Expand class height to fit the new attribute
+    if (classBounds.height) {
+      classBounds.height = Math.max(classBounds.height, 50 + (existingAttrCount + 1) * 25 + 15);
+    }
+
+    return model;
+  }
+
+  private addMethod(model: BESSERModel, modification: ModelModification): BESSERModel {
+    const { className } = modification.target;
+    if (!className) {
+      throw new Error('add_method requires a target className.');
+    }
+
+    const classId = this.findClassIdByName(model, className);
+    if (!classId || !model.elements[classId]) {
+      throw new Error(`Class '${className}' not found in the model.`);
+    }
+
+    const classElement = model.elements[classId];
+    if (!classElement.methods) {
+      classElement.methods = [];
+    }
+
+    const methodId = ModifierHelpers.generateUniqueId('method');
+    const visibilitySymbol = modification.changes.visibility === 'private' ? '-' :
+                              modification.changes.visibility === 'protected' ? '#' : '+';
+    const name = modification.changes.name || 'newMethod';
+    const returnType = normalizeType(modification.changes.returnType || 'any');
+    const paramStr = modification.changes.parameters?.map(p => `${p.name}: ${normalizeType(p.type)}`).join(', ') || '';
+    const methodLabel = `${visibilitySymbol} ${name}(${paramStr}): ${returnType}`;
+
+    const classBounds = classElement.bounds || { x: 0, y: 0, width: 220, height: 90 };
+    const existingAttrCount = (classElement.attributes || []).length;
+    const existingMethodCount = classElement.methods.length;
+    const methodY = classBounds.y + 50 + existingAttrCount * 25 + 10 + existingMethodCount * 25;
+
+    model.elements[methodId] = {
+      id: methodId,
+      name: methodLabel,
+      type: 'ClassMethod',
+      owner: classId,
+      bounds: { x: classBounds.x + 1, y: methodY, width: (classBounds.width || 220) - 2, height: 25 },
+    };
+
+    classElement.methods.push(methodId);
+
+    // Expand class height
+    if (classBounds.height) {
+      const totalRows = existingAttrCount + existingMethodCount + 1;
+      classBounds.height = Math.max(classBounds.height, 50 + totalRows * 25 + 25);
     }
 
     return model;

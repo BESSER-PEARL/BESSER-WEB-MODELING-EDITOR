@@ -3,9 +3,10 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { UMLDiagramType } from '@besser/wme';
 import { toast } from 'react-toastify';
 import { useProject } from '../../hooks/useProject';
-import { toUMLDiagramType } from '../../types/project';
+import { toUMLDiagramType, type SupportedDiagramType } from '../../types/project';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { updateDiagramThunk } from '../../services/diagram/diagramSlice';
+import { switchDiagramTypeThunk } from '../../services/project/projectSlice';
 import { useGitHubAuth } from '../../services/github/useGitHubAuth';
 import { GitHubSidebar } from '../github-sidebar';
 import { isDarkThemeEnabled, toggleTheme } from '../../utils/theme-switcher';
@@ -24,6 +25,7 @@ import {
 } from '../../application-constants';
 import { normalizeProjectName } from '../../utils/projectName';
 import { getWorkspaceContext } from '../../utils/workspaceContext';
+import type { GenerationResult } from '../../services/generate-code/types';
 import { JsonViewerModal } from '../modals/json-viewer-modal/json-viewer-modal';
 import { FeedbackDialog } from '../modals/FeedbackDialog';
 import { HelpGuideDialog } from '../modals/HelpGuideDialog';
@@ -51,6 +53,7 @@ interface WorkspaceShellProps {
   showQualityCheck?: boolean;
   generatorMode: GeneratorMenuMode;
   isGenerating?: boolean;
+  onAssistantGenerate?: (type: GeneratorType, config?: unknown) => Promise<GenerationResult>;
 }
 
 const sanitizeRepoName = (name: string): string => {
@@ -72,6 +75,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
   showQualityCheck = false,
   generatorMode,
   isGenerating = false,
+  onAssistantGenerate,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -129,7 +133,10 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
     setDiagramTitleDraft(diagram?.title ?? '');
   }, [diagram?.id, diagram?.title]);
 
-  const activeUmlType = useMemo(() => toUMLDiagramType(currentDiagramType), [currentDiagramType]);
+  const activeUmlType = useMemo(
+    () => toUMLDiagramType(currentDiagramType) ?? UMLDiagramType.ClassDiagram,
+    [currentDiagramType],
+  );
   const { isDeploymentAvailable } = getWorkspaceContext(
     location.pathname,
     currentProject?.currentDiagramType,
@@ -173,6 +180,70 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
       return;
     }
     switchDiagramType(type);
+  };
+
+  const handleAssistantSwitchDiagram = async (diagramType: string): Promise<boolean> => {
+    const isGuiDiagram = diagramType === 'GUINoCodeDiagram';
+    const isQuantumDiagram = diagramType === 'QuantumCircuitDiagram';
+
+    if (isGuiDiagram || isQuantumDiagram) {
+      try {
+        await dispatch(switchDiagramTypeThunk({ diagramType: diagramType as SupportedDiagramType })).unwrap();
+      } catch {
+        toast.error(`Could not switch to ${diagramType}.`);
+        return false;
+      }
+
+      if (isGuiDiagram && location.pathname !== '/graphical-ui-editor') {
+        navigate('/graphical-ui-editor');
+      }
+      if (isQuantumDiagram && location.pathname !== '/quantum-editor') {
+        navigate('/quantum-editor');
+      }
+
+      await new Promise<void>((resolve) => {
+        if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+          setTimeout(resolve, 0);
+          return;
+        }
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => resolve());
+        });
+      });
+
+      return true;
+    }
+
+    const umlType = toUMLDiagramType(diagramType as any);
+    if (!umlType) {
+      toast.info(`${diagramType} is not available.`);
+      return false;
+    }
+
+    if (location.pathname !== '/') {
+      navigate('/');
+    }
+
+    if (activeUmlType !== umlType) {
+      try {
+        await dispatch(switchDiagramTypeThunk({ diagramType: umlType })).unwrap();
+      } catch {
+        toast.error(`Could not switch to ${diagramType}.`);
+        return false;
+      }
+
+      await new Promise<void>((resolve) => {
+        if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+          setTimeout(resolve, 0);
+          return;
+        }
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => resolve());
+        });
+      });
+    }
+
+    return true;
   };
 
   const handleProjectRename = () => {
@@ -519,6 +590,8 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
         <AssistantWorkspaceDrawer
           open={isAssistantWorkspaceOpen}
           onOpenChange={setIsAssistantWorkspaceOpen}
+          onTriggerGenerator={onAssistantGenerate}
+          onSwitchDiagram={handleAssistantSwitchDiagram}
         />
       </div>
 

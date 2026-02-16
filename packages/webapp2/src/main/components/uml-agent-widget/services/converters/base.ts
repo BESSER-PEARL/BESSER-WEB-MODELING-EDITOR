@@ -5,12 +5,17 @@
 
 export type DiagramType = 'ClassDiagram' | 'ObjectDiagram' | 'StateMachineDiagram' | 'AgentDiagram';
 
+export interface DiagramPosition {
+  x: number;
+  y: number;
+}
+
 /**
  * Base interface for all diagram converters
  */
 export interface DiagramConverter {
   getDiagramType(): DiagramType;
-  convertSingleElement(spec: any, position?: { x: number; y: number }): any;
+  convertSingleElement(spec: any, position?: DiagramPosition): any;
   convertCompleteSystem(spec: any): any;
 }
 
@@ -39,10 +44,37 @@ export class PositionGenerator {
     return { x, y };
   }
 
+  reservePosition(position: DiagramPosition): void {
+    this.usedPositions.add(`${position.x},${position.y}`);
+  }
+
   reset(): void {
     this.usedPositions.clear();
   }
 }
+
+const toFiniteNumber = (value: unknown): number | undefined => {
+  const parsed = typeof value === 'string' ? Number(value) : value;
+  return typeof parsed === 'number' && Number.isFinite(parsed) ? parsed : undefined;
+};
+
+export const extractSpecPosition = (spec: any): DiagramPosition | undefined => {
+  if (!spec || typeof spec !== 'object') {
+    return undefined;
+  }
+
+  const fromNested = spec.position && typeof spec.position === 'object' ? spec.position : undefined;
+  const x = toFiniteNumber(fromNested?.x ?? spec.x);
+  const y = toFiniteNumber(fromNested?.y ?? spec.y);
+  if (typeof x !== 'number' || typeof y !== 'number') {
+    return undefined;
+  }
+
+  return {
+    x: Math.round(x),
+    y: Math.round(y),
+  };
+};
 
 /**
  * Generate unique ID

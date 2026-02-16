@@ -1,4 +1,3 @@
-import { Dispatch } from '@reduxjs/toolkit';
 import { updateDiagramThunk } from '../../../services/diagram/diagramSlice';
 import type { AppDispatch } from '../../../store/store';
 import { ConverterFactory, DiagramType } from './converters';
@@ -10,6 +9,7 @@ export type { ModelModification };
 // Enhanced interfaces for better type safety
 export interface ClassSpec {
   className: string;
+  position?: { x: number; y: number };
   attributes: Array<{
     name: string;
     type: string;
@@ -58,6 +58,12 @@ export interface BESSERModel {
  * Supports multiple diagram types: ClassDiagram, ObjectDiagram, StateMachineDiagram, AgentDiagram
  */
 export class UMLModelingService {
+  private readonly layoutStartX = -940;
+  private readonly layoutStartY = -600;
+  private readonly layoutStepX = 360;
+  private readonly layoutStepY = 280;
+  private readonly layoutColumns = 3;
+
   private editor: any;
   private dispatch: AppDispatch;
   private currentModel: BESSERModel | null = null;
@@ -122,7 +128,9 @@ export class UMLModelingService {
     try {
       const type = (diagramType || this.currentDiagramType) as DiagramType;
       const converter = ConverterFactory.getConverter(type);
-      const completeElement = converter.convertSingleElement(spec);
+      const currentModel = this.getCurrentModel();
+      const insertPosition = this.hasPositionHint(spec) ? undefined : this.getNextLayoutPosition(currentModel);
+      const completeElement = converter.convertSingleElement(spec, insertPosition);
       
       return {
         type: 'single_element',
@@ -143,10 +151,22 @@ export class UMLModelingService {
       const type = (diagramType || this.currentDiagramType) as DiagramType;
       const converter = ConverterFactory.getConverter(type);
       const completeSystem = converter.convertCompleteSystem(systemSpec);
+      const shouldKeepExplicitLayout = this.hasExplicitSystemLayout(systemSpec, type);
+      const shiftedSystem = shouldKeepExplicitLayout
+        ? completeSystem
+        : (() => {
+            const currentModel = this.getCurrentModel();
+            const nextPosition = this.getNextLayoutPosition(currentModel);
+            const anchorPosition = this.getLayoutAnchor(completeSystem);
+            return this.offsetSystemLayout(completeSystem, {
+              x: nextPosition.x - anchorPosition.x,
+              y: nextPosition.y - anchorPosition.y,
+            });
+          })();
       
       return {
         type: 'complete_system',
-        data: completeSystem,
+        data: shiftedSystem,
         message: `✨ Created complete ${type} system`
       };
     } catch (error) {
@@ -216,28 +236,22 @@ export class UMLModelingService {
           throw new Error(`Unknown update type: ${update.type}`);
       }
 
-      console.log('🔄 Injecting model update...', {
-        type: update.type,
-        elementCount: Object.keys(updatedModel.elements || {}).length,
-        hasEditor: !!this.editor
-      });
+      console.debug('[UMLModelingService] Injecting model update:', update.type,
+        'elements:', Object.keys(updatedModel.elements || {}).length,
+      );
 
-      // CRITICAL FIX: Await Redux store update to ensure persistence
+      // Persist to Redux store first, then update editor
       await this.dispatch(updateDiagramThunk({
         model: updatedModel as any,
         lastUpdate: new Date().toISOString()
       })).unwrap();
-      console.log('✅ Redux persistence complete');
 
-      // CRITICAL FIX: Update editor AFTER Redux persistence completes
-      // Use nextRender to ensure proper editor update cycle
       if (this.editor) {
         await this.editor.nextRender;
         this.editor.model = { ...updatedModel };
         await this.editor.nextRender;
-        console.log('✅ Editor model updated and rendered');
       } else {
-        console.warn('⚠️ No editor reference available - model saved to Redux only');
+        console.warn('[UMLModelingService] No editor reference — model saved to Redux only');
       }
 
       // Update our current model reference
@@ -245,7 +259,7 @@ export class UMLModelingService {
 
       return true;
     } catch (error) {
-      console.error('❌ Error injecting to editor:', error);
+      console.error('[UMLModelingService] Error injecting to editor:', error);
       throw error; // Re-throw to let caller handle it
     }
   }
@@ -276,31 +290,219 @@ export class UMLModelingService {
       throw new Error('Model payload does not include any elements to render');
     }
 
-    console.log('🔄 Replacing model...', {
-      elementCount: Object.keys(mergedModel.elements).length,
-      hasEditor: !!this.editor
-    });
+    console.debug('[UMLModelingService] Replacing model:',
+      'elements:', Object.keys(mergedModel.elements).length,
+    );
 
-    // CRITICAL FIX: Await Redux store update to ensure persistence
+    // Persist to Redux store first, then update editor
     await this.dispatch(updateDiagramThunk({
       model: mergedModel as any,
       lastUpdate: new Date().toISOString()
     })).unwrap();
-    console.log('✅ Redux persistence complete');
 
-    // CRITICAL FIX: Update editor AFTER Redux persistence completes
     if (this.editor) {
       await this.editor.nextRender;
       this.editor.model = { ...mergedModel };
       await this.editor.nextRender;
-      console.log('✅ Editor model replaced and rendered');
     } else {
-      console.warn('⚠️ No editor reference available - model saved to Redux only');
+      console.warn('[UMLModelingService] No editor reference — model saved to Redux only');
     }
 
     this.updateCurrentModel(mergedModel);
 
     return true;
+  }
+
+  /**
+   * Get all top-level diagram elements with coordinates.
+   */
+  private getTopLevelElements(model: Partial<BESSERModel> | null | undefined): Array<{ id: string; bounds: { x: number; y: number } }> {
+    if (!model?.elements || typeof model.elements !== 'object') {
+      return [];
+    }
+
+    return Object.entries(model.elements)
+      .filter(([, element]) => {
+        const candidate = element as any;
+        if (!candidate || typeof candidate !== 'object') {
+          return false;
+        }
+        if (candidate.owner !== null && candidate.owner !== undefined) {
+          return false;
+        }
+        const bounds = candidate.bounds;
+        return bounds && typeof bounds.x === 'number' && typeof bounds.y === 'number';
+      })
+      .map(([id, element]) => ({
+        id,
+        bounds: {
+          x: (element as any).bounds.x,
+          y: (element as any).bounds.y,
+        },
+      }));
+  }
+
+  /**
+   * Compute the next free grid coordinate based on existing top-level elements.
+   */
+  private getNextLayoutPosition(model: BESSERModel): { x: number; y: number } {
+    const topLevelElements = this.getTopLevelElements(model);
+    const occupied = new Set<string>();
+
+    topLevelElements.forEach(({ bounds }) => {
+      const col = Math.max(0, Math.round((bounds.x - this.layoutStartX) / this.layoutStepX));
+      const row = Math.max(0, Math.round((bounds.y - this.layoutStartY) / this.layoutStepY));
+      occupied.add(`${col}:${row}`);
+    });
+
+    const maxRowsToScan = Math.max(8, Math.ceil((topLevelElements.length + 1) / this.layoutColumns) + 6);
+    for (let row = 0; row < maxRowsToScan; row += 1) {
+      for (let col = 0; col < this.layoutColumns; col += 1) {
+        const key = `${col}:${row}`;
+        if (!occupied.has(key)) {
+          return {
+            x: this.layoutStartX + col * this.layoutStepX,
+            y: this.layoutStartY + row * this.layoutStepY,
+          };
+        }
+      }
+    }
+
+    const fallbackRow = Math.ceil(topLevelElements.length / this.layoutColumns);
+    return {
+      x: this.layoutStartX,
+      y: this.layoutStartY + fallbackRow * this.layoutStepY,
+    };
+  }
+
+  private hasPositionHint(spec: any): boolean {
+    if (!spec || typeof spec !== 'object') {
+      return false;
+    }
+    const nested = spec.position;
+    const x = nested && typeof nested === 'object' ? nested.x : spec.x;
+    const y = nested && typeof nested === 'object' ? nested.y : spec.y;
+    const parsedX = typeof x === 'string' ? Number(x) : x;
+    const parsedY = typeof y === 'string' ? Number(y) : y;
+    return Number.isFinite(parsedX) && Number.isFinite(parsedY);
+  }
+
+  private hasExplicitSystemLayout(systemSpec: any, diagramType: DiagramType): boolean {
+    if (!systemSpec || typeof systemSpec !== 'object') {
+      return false;
+    }
+
+    if (diagramType === 'ClassDiagram') {
+      return Array.isArray(systemSpec.classes) && systemSpec.classes.some((item: any) => this.hasPositionHint(item));
+    }
+
+    if (diagramType === 'ObjectDiagram') {
+      return Array.isArray(systemSpec.objects) && systemSpec.objects.some((item: any) => this.hasPositionHint(item));
+    }
+
+    if (diagramType === 'StateMachineDiagram') {
+      return Array.isArray(systemSpec.states) && systemSpec.states.some((item: any) => this.hasPositionHint(item));
+    }
+
+    if (diagramType === 'AgentDiagram') {
+      const stateHints = Array.isArray(systemSpec.states) && systemSpec.states.some((item: any) => this.hasPositionHint(item));
+      const intentHints = Array.isArray(systemSpec.intents) && systemSpec.intents.some((item: any) => this.hasPositionHint(item));
+      const initialHint = this.hasPositionHint(systemSpec.initialNode) || this.hasPositionHint({ position: systemSpec.initialPosition });
+      return Boolean(stateHints || intentHints || initialHint);
+    }
+
+    return false;
+  }
+
+  /**
+   * Anchor used to offset generated systems into a free area in the current canvas.
+   */
+  private getLayoutAnchor(systemData: any): { x: number; y: number } {
+    const topLevelElements = this.getTopLevelElements(systemData as Partial<BESSERModel>);
+    if (!topLevelElements.length) {
+      return { x: this.layoutStartX, y: this.layoutStartY };
+    }
+
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    topLevelElements.forEach(({ bounds }) => {
+      if (bounds.x < minX) {
+        minX = bounds.x;
+      }
+      if (bounds.y < minY) {
+        minY = bounds.y;
+      }
+    });
+
+    return { x: minX, y: minY };
+  }
+
+  /**
+   * Shift system elements (and relationship geometry) by an offset.
+   */
+  private offsetSystemLayout(systemData: any, offset: { x: number; y: number }): any {
+    if (!systemData || !systemData.elements || (offset.x === 0 && offset.y === 0)) {
+      return systemData;
+    }
+
+    const shiftedElements = Object.fromEntries(
+      Object.entries(systemData.elements).map(([elementId, element]) => {
+        const candidate = element as any;
+        if (!candidate?.bounds) {
+          return [elementId, candidate];
+        }
+        return [
+          elementId,
+          {
+            ...candidate,
+            bounds: {
+              ...candidate.bounds,
+              x: candidate.bounds.x + offset.x,
+              y: candidate.bounds.y + offset.y,
+            },
+          },
+        ];
+      }),
+    );
+
+    const shiftedRelationships = Object.fromEntries(
+      Object.entries(systemData.relationships || {}).map(([relationshipId, relationship]) => {
+        const candidate = relationship as any;
+        if (!candidate || typeof candidate !== 'object') {
+          return [relationshipId, candidate];
+        }
+
+        const shiftBounds = (bounds: any) =>
+          bounds && typeof bounds.x === 'number' && typeof bounds.y === 'number'
+            ? { ...bounds, x: bounds.x + offset.x, y: bounds.y + offset.y }
+            : bounds;
+
+        const shiftedPath = Array.isArray(candidate.path)
+          ? candidate.path.map((point: any) =>
+              point && typeof point.x === 'number' && typeof point.y === 'number'
+                ? { ...point, x: point.x + offset.x, y: point.y + offset.y }
+                : point,
+            )
+          : candidate.path;
+
+        return [
+          relationshipId,
+          {
+            ...candidate,
+            bounds: shiftBounds(candidate.bounds),
+            path: shiftedPath,
+            source: candidate.source ? { ...candidate.source, bounds: shiftBounds(candidate.source.bounds) } : candidate.source,
+            target: candidate.target ? { ...candidate.target, bounds: shiftBounds(candidate.target.bounds) } : candidate.target,
+          },
+        ];
+      }),
+    );
+
+    return {
+      ...systemData,
+      elements: shiftedElements,
+      relationships: shiftedRelationships,
+    };
   }
 
   /**

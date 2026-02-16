@@ -160,6 +160,11 @@ export const ProjectHubDialog: React.FC<ProjectHubDialogProps> = ({ open, onOpen
   };
 
   const handleDeleteProject = async (projectId: string, projectName: string) => {
+    const confirmed = window.confirm(`Delete project "${projectName}"? This action cannot be undone.`);
+    if (!confirmed) {
+      return;
+    }
+
     try {
       setIsBusy(true);
       await deleteProject(projectId);
@@ -407,15 +412,29 @@ export const ProjectHubDialog: React.FC<ProjectHubDialogProps> = ({ open, onOpen
                 {projects.length > 0 ? (
                   <div className="space-y-2">
                     {projects.slice(0, 3).map((project) => (
-                      <button
-                        type="button"
+                      <div
                         key={project.id}
-                        className="flex w-full items-center justify-between rounded-md border border-border/70 bg-background px-3 py-2 text-left transition hover:border-primary/40 hover:bg-primary/5"
-                        onClick={() => void handleOpenProject(project.id)}
+                        className="flex items-center gap-2 rounded-md border border-border/70 bg-background px-2 py-1.5 transition hover:border-primary/40 hover:bg-primary/5"
                       >
-                        <span className="truncate text-sm">{project.name}</span>
-                        <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
-                      </button>
+                        <button
+                          type="button"
+                          className="flex min-w-0 flex-1 items-center justify-between text-left"
+                          onClick={() => void handleOpenProject(project.id)}
+                          disabled={isBusy}
+                        >
+                          <span className="truncate text-sm">{project.name}</span>
+                          <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
+                        </button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => void handleDeleteProject(project.id, project.name)}
+                          disabled={isBusy}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     ))}
                     <Button
                       variant="ghost"
@@ -493,15 +512,29 @@ export const ProjectHubDialog: React.FC<ProjectHubDialogProps> = ({ open, onOpen
                   </CardHeader>
                   <CardContent className="space-y-2">
                     {projects.slice(0, 5).map((project) => (
-                      <button
+                      <div
                         key={project.id}
-                        type="button"
-                        className="flex w-full items-center justify-between rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-left text-sm transition hover:border-primary/40 hover:bg-primary/5"
-                        onClick={() => void handleOpenProject(project.id)}
+                        className="flex items-center gap-2 rounded-md border border-border/70 bg-muted/20 px-2 py-1.5 text-sm transition hover:border-primary/40 hover:bg-primary/5"
                       >
-                        <span className="truncate">{project.name}</span>
-                        <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
-                      </button>
+                        <button
+                          type="button"
+                          className="flex min-w-0 flex-1 items-center justify-between text-left"
+                          onClick={() => void handleOpenProject(project.id)}
+                          disabled={isBusy}
+                        >
+                          <span className="truncate">{project.name}</span>
+                          <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
+                        </button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => void handleDeleteProject(project.id, project.name)}
+                          disabled={isBusy}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     ))}
                     {projects.length === 0 && <p className="text-xs text-muted-foreground">No projects yet.</p>}
                   </CardContent>

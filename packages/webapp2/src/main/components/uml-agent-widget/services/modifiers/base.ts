@@ -51,7 +51,9 @@ export interface ModificationChanges {
 export interface ModelModification {
   action: 
     | 'modify_class' 
+    | 'add_attribute'
     | 'modify_attribute' 
+    | 'add_method'
     | 'modify_method' 
     | 'add_relationship' 
     | 'remove_element'
