@@ -76,7 +76,58 @@ export const GraphicalUIEditor: React.FC = () => {
         }
       };
 
+      const handleAssistantLoadModel = async (event: Event) => {
+        try {
+          const detail = (event as CustomEvent).detail;
+          const model = detail?.model;
+          if (!model || !isGrapesJSProjectData(model)) {
+            throw new Error('Invalid GrapesJS model data');
+          }
+
+          // Clear existing pages
+          const pages = editor.Pages;
+          if (pages) {
+            const existing = pages.getAll();
+            existing.forEach((page: any) => pages.remove(page));
+          }
+
+          // Load the new project data into the live editor
+          editor.loadProjectData(model);
+
+          // Persist to ProjectStorageRepository
+          const project = ProjectStorageRepository.getCurrentProject();
+          if (project) {
+            const normalized = normalizeToGrapesJSProjectData(model);
+            ProjectStorageRepository.updateDiagram(project.id, 'GUINoCodeDiagram', {
+              ...project.diagrams.GUINoCodeDiagram,
+              model: normalized,
+              lastUpdate: new Date().toISOString(),
+            });
+          }
+
+          editor.runCommand('notifications:add', {
+            type: 'success',
+            message: '✓ GUI model loaded from assistant.',
+            group: 'Assistant Load Model',
+          });
+          window.dispatchEvent(
+            new CustomEvent('wme:assistant-load-gui-model-done', {
+              detail: { ok: true },
+            }),
+          );
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          console.error('[Assistant Load Model] Error:', error);
+          window.dispatchEvent(
+            new CustomEvent('wme:assistant-load-gui-model-done', {
+              detail: { ok: false, error: message },
+            }),
+          );
+        }
+      };
+
       window.addEventListener('wme:assistant-auto-generate-gui', handleAssistantAutoGenerate as EventListener);
+      window.addEventListener('wme:assistant-load-gui-model', handleAssistantLoadModel as EventListener);
       (window as any).__WME_GUI_EDITOR_READY__ = true;
       window.dispatchEvent(new CustomEvent('wme:gui-editor-ready'));
 
@@ -109,6 +160,7 @@ export const GraphicalUIEditor: React.FC = () => {
         if (cleanup) cleanup();
 
         window.removeEventListener('wme:assistant-auto-generate-gui', handleAssistantAutoGenerate as EventListener);
+        window.removeEventListener('wme:assistant-load-gui-model', handleAssistantLoadModel as EventListener);
         (window as any).__WME_GUI_EDITOR_READY__ = false;
         
         // Destroy editor

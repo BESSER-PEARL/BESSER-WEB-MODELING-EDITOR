@@ -19,7 +19,7 @@ import {
   ModelModification,
   ModelUpdate,
   BESSERModel,
-} from '../uml-agent-widget/services/UMLModelingService';
+} from './services/UMLModelingService';
 import type { GeneratorType } from '../sidebar/workspace-types';
 import type { GenerationResult } from '../../services/generate-code/types';
 import { isUMLModel } from '../../types/project';
@@ -54,7 +54,15 @@ const STARTER_PROMPTS = [
   'Design an API for IoT monitoring',
 ];
 
+// Diagram types that go through the UMLModelingService for structured element/system injection.
+// Quantum and GUI diagrams use the raw `model` replacement path instead.
 const UML_DIAGRAM_TYPES = new Set(['ClassDiagram', 'ObjectDiagram', 'StateMachineDiagram', 'AgentDiagram']);
+
+// All supported diagram types (used for ensureTargetDiagramReady).
+const ALL_DIAGRAM_TYPES = new Set([
+  'ClassDiagram', 'ObjectDiagram', 'StateMachineDiagram', 'AgentDiagram',
+  'QuantumCircuitDiagram', 'GUINoCodeDiagram',
+]);
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 const isUmlDiagramType = (diagramType?: string): boolean => (diagramType ? UML_DIAGRAM_TYPES.has(diagramType) : false);
@@ -343,17 +351,22 @@ export const AssistantWorkspaceDrawer: React.FC<AssistantWorkspaceDrawerProps> =
         let update: ModelUpdate | null = null;
         switch (command.action) {
           case 'inject_element':
-            if (command.element && typeof command.element === 'object' && command.element.className) {
+            if (command.element && typeof command.element === 'object' &&
+                (command.element.className || command.element.stateName || command.element.objectName || command.element.type)) {
               update = modelingServiceRef.current.processSimpleClassSpec(command.element as ClassSpec, command.diagramType);
             } else if (command.element) {
-              throw new Error('inject_element payload is missing required className field');
+              throw new Error('inject_element payload is missing a recognizable element specification');
             }
             break;
           case 'inject_complete_system':
-            if (command.systemSpec && typeof command.systemSpec === 'object' && Array.isArray(command.systemSpec.classes ?? command.systemSpec.states ?? command.systemSpec.objects)) {
+            if (command.systemSpec && typeof command.systemSpec === 'object' &&
+                Array.isArray(command.systemSpec.classes ?? command.systemSpec.states ?? command.systemSpec.objects ?? command.systemSpec.intents)) {
+              update = modelingServiceRef.current.processSystemSpec(command.systemSpec as SystemSpec, command.diagramType);
+            } else if (command.systemSpec && typeof command.systemSpec === 'object' && Object.keys(command.systemSpec).length > 0) {
+              // Fallback: spec has keys but none of the known arrays — still attempt processing
               update = modelingServiceRef.current.processSystemSpec(command.systemSpec as SystemSpec, command.diagramType);
             } else if (command.systemSpec) {
-              throw new Error('inject_complete_system payload is missing a valid classes/states/objects array');
+              throw new Error('inject_complete_system payload is missing a valid classes/states/objects/intents array');
             }
             break;
           case 'modify_model':
@@ -377,15 +390,30 @@ export const AssistantWorkspaceDrawer: React.FC<AssistantWorkspaceDrawerProps> =
       }
 
       if (!applied && command.model) {
-        const result = await dispatch(updateCurrentDiagramThunk({ model: command.model as any }));
-        if (updateCurrentDiagramThunk.rejected.match(result)) {
-          throw new Error(result.error.message || 'Failed to persist assistant model update');
-        }
-        applied = true;
-      }
+        const targetDiagramIsGui = targetDiagramType === 'GUINoCodeDiagram';
 
-      if (!applied && targetIsUml && !modelingServiceRef.current) {
-        throw new Error('UML modeling service not ready');
+        if (targetDiagramIsGui && (window as any).__WME_GUI_EDITOR_READY__) {
+          // Push the GrapesJS-native model directly into the live editor via event bridge.
+          const loadResult = await new Promise<{ ok: boolean; error?: string }>((resolve) => {
+            const onDone = (event: Event) => {
+              window.removeEventListener('wme:assistant-load-gui-model-done', onDone);
+              resolve((event as CustomEvent).detail ?? { ok: false, error: 'No response' });
+            };
+            window.addEventListener('wme:assistant-load-gui-model-done', onDone);
+            window.dispatchEvent(new CustomEvent('wme:assistant-load-gui-model', { detail: { model: command.model } }));
+          });
+          if (!loadResult.ok) {
+            throw new Error(loadResult.error || 'Failed to load GUI model into editor');
+          }
+          applied = true;
+        } else {
+          // Non-UML diagram types (Quantum) or GUI when editor is not mounted: persist via Redux.
+          const result = await dispatch(updateCurrentDiagramThunk({ model: command.model as any }));
+          if (updateCurrentDiagramThunk.rejected.match(result)) {
+            throw new Error(result.error.message || 'Failed to persist assistant model update');
+          }
+          applied = true;
+        }
       }
 
       if (!applied) {
@@ -408,7 +436,13 @@ export const AssistantWorkspaceDrawer: React.FC<AssistantWorkspaceDrawerProps> =
   };
 
   const handleAction = async (payload: AssistantActionPayload) => {
-    if (payload.action === 'assistant_message') {
+    // Injection commands are fully handled by handleInjection — skip here.
+    if (
+      payload.action === 'assistant_message' ||
+      payload.action === 'inject_element' ||
+      payload.action === 'inject_complete_system' ||
+      payload.action === 'modify_model'
+    ) {
       return;
     }
 
@@ -467,6 +501,78 @@ export const AssistantWorkspaceDrawer: React.FC<AssistantWorkspaceDrawerProps> =
     if (payload.action === 'agent_error') {
       const message = typeof payload.message === 'string' ? payload.message : 'Something went wrong on the assistant side.';
       setMessages((prev) => [...prev, toKitMessage('assistant', message)]);
+      return;
+    }
+
+    if (payload.action === 'auto_generate_gui') {
+      // Switch to GUINoCodeDiagram first so the GrapesJS editor is mounted.
+      const diagramReady = await ensureTargetDiagramReady('GUINoCodeDiagram');
+      if (!diagramReady) {
+        setMessages((prev) => [
+          ...prev,
+          toKitMessage('assistant', 'Could not switch to the GUI editor. Please switch manually and try again.'),
+        ]);
+        return;
+      }
+
+      // Wait for the GrapesJS editor to be ready (it mounts asynchronously).
+      const editorReady = await new Promise<boolean>((resolve) => {
+        if ((window as any).__WME_GUI_EDITOR_READY__) {
+          resolve(true);
+          return;
+        }
+        const onReady = () => {
+          window.removeEventListener('wme:gui-editor-ready', onReady);
+          resolve(true);
+        };
+        window.addEventListener('wme:gui-editor-ready', onReady);
+        // Timeout after 8 seconds — editor may already be destroyed.
+        setTimeout(() => {
+          window.removeEventListener('wme:gui-editor-ready', onReady);
+          resolve((window as any).__WME_GUI_EDITOR_READY__ === true);
+        }, 8000);
+      });
+
+      if (!editorReady) {
+        setMessages((prev) => [
+          ...prev,
+          toKitMessage('assistant', 'The GUI editor did not become ready in time. Please try again.'),
+        ]);
+        return;
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        toKitMessage('assistant', 'Generating GUI from your Class Diagram\u2026'),
+      ]);
+
+      // Dispatch the auto-generate event and wait for the result.
+      const result = await new Promise<{ ok: boolean; error?: string }>((resolve) => {
+        const onDone = (event: Event) => {
+          window.removeEventListener('wme:assistant-auto-generate-gui-done', onDone);
+          resolve((event as CustomEvent).detail ?? { ok: false, error: 'No response' });
+        };
+        window.addEventListener('wme:assistant-auto-generate-gui-done', onDone);
+        window.dispatchEvent(new CustomEvent('wme:assistant-auto-generate-gui'));
+      });
+
+      if (result.ok) {
+        setMessages((prev) => [
+          ...prev,
+          toKitMessage(
+            'assistant',
+            typeof payload.message === 'string' && payload.message.trim()
+              ? payload.message
+              : '\u2713 GUI generated successfully from your Class Diagram! Each class now has its own page with a data table and method buttons.',
+          ),
+        ]);
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          toKitMessage('assistant', `Could not generate the GUI: ${result.error || 'unknown error'}. Make sure you have classes defined in your Class Diagram.`),
+        ]);
+      }
+      return;
     }
   };
 

@@ -7,6 +7,7 @@ export interface AssistantWorkspaceContext {
   activeDiagramId?: string;
   activeModel?: any;
   projectSnapshot?: any;
+  diagramSummaries?: Array<{ diagramType: string; diagramId?: string; title?: string }>;
 }
 
 export interface AssistantClientOptions {
@@ -22,6 +23,7 @@ export type AssistantActionName =
   | 'modify_model'
   | 'switch_diagram'
   | 'trigger_generator'
+  | 'auto_generate_gui'
   | 'agent_error';
 
 export interface AssistantActionPayload {

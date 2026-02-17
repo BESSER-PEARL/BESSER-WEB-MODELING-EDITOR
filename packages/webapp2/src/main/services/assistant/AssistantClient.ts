@@ -40,6 +40,7 @@ const KNOWN_ACTIONS = new Set([
   'modify_model',
   'switch_diagram',
   'trigger_generator',
+  'auto_generate_gui',
   'agent_error',
 ]);
 
@@ -188,6 +189,7 @@ export class AssistantClient {
         this.ws.onclose = () => {
           this.isConnected = false;
           this.connectingPromise = null;
+          this.onTypingHandler?.(false);
           this.onConnectionHandler?.(false);
           if (this.shouldReconnect) {
             this.attemptReconnect();
@@ -200,6 +202,7 @@ export class AssistantClient {
           console.error('Assistant WebSocket error:', error);
           this.isConnected = false;
           this.connectingPromise = null;
+          this.onTypingHandler?.(false);
           this.onConnectionHandler?.(false);
           if (this.shouldReconnect) {
             this.attemptReconnect();
@@ -237,6 +240,7 @@ export class AssistantClient {
     if (options.clearQueue) {
       this.messageQueue = [];
     }
+    this.onTypingHandler?.(false);
     this.onConnectionHandler?.(false);
   }
 
@@ -393,8 +397,12 @@ export class AssistantClient {
                   ? payload.message
                   : 'Applied assistant update.',
           });
+          // Don't fire the action handler for injection commands —
+          // they are fully processed by the injection handler above.
+          // Firing both would enqueue duplicate tasks in the drawer.
+        } else {
+          this.onActionHandler?.(directAction);
         }
-        this.onActionHandler?.(directAction);
 
         if (directAction.action === 'assistant_message' && typeof directAction.message === 'string') {
           const chatMessage: ChatMessage = {
@@ -495,10 +503,17 @@ export class AssistantClient {
 
     queued.forEach((item, index) => {
       setTimeout(() => {
+        // Re-check connection state before each deferred send.
+        if (!this.isConnected || !this.ws) {
+          // Re-queue the message so it's not silently lost.
+          this.messageQueue.push(item);
+          return;
+        }
         try {
           this.sendPayload(this.buildUserPayload(item.message, item.diagramType, item.model, item.context));
         } catch {
-          // If sending fails after reconnect, drop silently and rely on user retry.
+          // Re-queue on failure so it's retried on next reconnect.
+          this.messageQueue.push(item);
         }
       }, index * 1000);
     });

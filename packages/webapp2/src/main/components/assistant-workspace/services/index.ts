@@ -1,0 +1,41 @@
+/**
+ * Assistant Workspace Services
+ * Central export point for all services used by the AssistantWorkspaceDrawer
+ */
+
+export { UMLModelingService } from './UMLModelingService';
+export type {
+  ClassSpec,
+  SystemSpec,
+  ModelUpdate,
+  BESSERModel,
+  ModelModification,
+} from './UMLModelingService';
+
+export { RateLimiterService } from './RateLimiterService';
+export type {
+  RateLimitConfig,
+  RateLimitResult,
+  RateLimitStatus,
+  RateLimiterOptions,
+} from './RateLimiterService';
+
+export { UIService } from './UIService';
+export type {
+  ChatMessage,
+  MessageDisplayConfig,
+} from './UIService';
+
+export { ConverterFactory } from './converters';
+export type { DiagramType, DiagramConverter, DiagramPosition } from './converters';
+export { QuantumCircuitConverter } from './converters/QuantumCircuitConverter';
+export { GUIDiagramConverter } from './converters/GUIDiagramConverter';
+
+export { ModifierFactory, ModifierHelpers } from './modifiers';
+export type {
+  DiagramModifier,
+  ModificationTarget,
+  ModificationChanges,
+} from './modifiers';
+export { QuantumCircuitModifier } from './modifiers/QuantumCircuitModifier';
+export { GUIDiagramModifier } from './modifiers/GUIDiagramModifier';
