@@ -359,12 +359,13 @@ export const AssistantWorkspaceDrawer: React.FC<AssistantWorkspaceDrawerProps> =
             }
             break;
           case 'inject_complete_system':
+            console.log('[Drawer] inject_complete_system: replaceExisting=', command.replaceExisting, 'command keys=', Object.keys(command));
             if (command.systemSpec && typeof command.systemSpec === 'object' &&
                 Array.isArray(command.systemSpec.classes ?? command.systemSpec.states ?? command.systemSpec.objects ?? command.systemSpec.intents)) {
-              update = modelingServiceRef.current.processSystemSpec(command.systemSpec as SystemSpec, command.diagramType);
+              update = modelingServiceRef.current.processSystemSpec(command.systemSpec as SystemSpec, command.diagramType, command.replaceExisting);
             } else if (command.systemSpec && typeof command.systemSpec === 'object' && Object.keys(command.systemSpec).length > 0) {
               // Fallback: spec has keys but none of the known arrays — still attempt processing
-              update = modelingServiceRef.current.processSystemSpec(command.systemSpec as SystemSpec, command.diagramType);
+              update = modelingServiceRef.current.processSystemSpec(command.systemSpec as SystemSpec, command.diagramType, command.replaceExisting);
             } else if (command.systemSpec) {
               throw new Error('inject_complete_system payload is missing a valid classes/states/objects/intents array');
             }

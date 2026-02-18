@@ -57,6 +57,7 @@ export interface InjectionCommand {
   message: string;
   diagramType?: string;
   diagramId?: string;
+  replaceExisting?: boolean;
 }
 
 export type MessageHandler = (message: ChatMessage) => void;

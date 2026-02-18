@@ -14,7 +14,7 @@ import { ApollonEditorComponent } from './components/apollon-editor-component/Ap
 import { GraphicalUIEditor } from './components/grapesjs-editor';
 import { QuantumEditorComponent } from './components/quantum-editor-component/QuantumEditorComponent';
 import { ErrorPanel } from './components/error-handling/error-panel';
-import { UMLAgentModeling } from './components/uml-agent-widget/UMLAgentModeling';
+import { AssistantWidget } from './components/assistant-workspace/AssistantWidget';
 import { CookieConsentBanner, hasUserConsented } from './components/cookie-consent/CookieConsentBanner';
 import { ApplicationStore } from './store/application-store';
 import { useProject } from './hooks/useProject';
@@ -145,7 +145,7 @@ function AppContentInner() {
       />
 
       <ErrorPanel />
-      <UMLAgentModeling onAssistantGenerate={handleAssistantGenerate} />
+      <AssistantWidget onAssistantGenerate={handleAssistantGenerate} />
       <ToastContainer />
     </ApollonEditorProvider>
   );

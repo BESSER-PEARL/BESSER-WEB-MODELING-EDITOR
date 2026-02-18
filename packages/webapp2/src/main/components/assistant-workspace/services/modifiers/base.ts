@@ -63,6 +63,7 @@ export interface ModelModification {
     | 'add_method'
     | 'modify_method' 
     | 'add_relationship' 
+    | 'modify_relationship'
     | 'remove_element'
     | 'modify_state'
     | 'modify_intent'
@@ -119,8 +120,16 @@ export class ModifierHelpers {
    * Find element by name and type
    */
   static findElementByName(model: BESSERModel, name: string, type: string): string | null {
+    const normalizedName = (name || '').trim().toLowerCase();
+    // First pass: exact match
     for (const [id, element] of Object.entries(model.elements)) {
       if (element.type === type && element.name === name) {
+        return id;
+      }
+    }
+    // Second pass: case-insensitive match
+    for (const [id, element] of Object.entries(model.elements)) {
+      if (element.type === type && (element.name || '').trim().toLowerCase() === normalizedName) {
         return id;
       }
     }

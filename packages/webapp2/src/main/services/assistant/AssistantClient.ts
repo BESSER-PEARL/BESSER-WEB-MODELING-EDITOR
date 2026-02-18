@@ -401,6 +401,7 @@ export class AssistantClient {
       const directAction = this.extractActionPayload(payload);
       if (directAction) {
         if (isInjectionCommand(directAction)) {
+          console.log('[AssistantClient] Injection command detected:', directAction.action, 'replaceExisting=', (directAction as any).replaceExisting, 'keys=', Object.keys(directAction));
           this.onInjectionHandler?.({
             ...directAction,
             message:

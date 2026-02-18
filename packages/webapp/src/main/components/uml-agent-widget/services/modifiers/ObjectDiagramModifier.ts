@@ -14,7 +14,6 @@ export class ObjectDiagramModifier implements DiagramModifier {
   canHandle(action: string): boolean {
     return [
       'modify_object',
-      'modify_attribute_value',
       'add_link',
       'remove_element'
     ].includes(action);
@@ -26,8 +25,6 @@ export class ObjectDiagramModifier implements DiagramModifier {
     switch (modification.action) {
       case 'modify_object':
         return this.modifyObject(updatedModel, modification);
-      case 'modify_attribute_value':
-        return this.modifyAttributeValue(updatedModel, modification);
       case 'add_link':
         return this.addLink(updatedModel, modification);
       case 'remove_element':
@@ -45,46 +42,6 @@ export class ObjectDiagramModifier implements DiagramModifier {
       if (modification.changes.name) {
         model.elements[targetId].name = modification.changes.name;
       }
-    }
-
-    return model;
-  }
-
-  /**
-   * Modify an attribute value on an existing object.
-   * Finds the ObjectAttribute child whose name starts with the target attributeName
-   * and updates its display string to "attributeName = newValue".
-   */
-  private modifyAttributeValue(model: BESSERModel, modification: ModelModification): BESSERModel {
-    const { objectName, attributeName } = modification.target;
-    const newValue = modification.changes.value;
-
-    if (!objectName || !attributeName || newValue === undefined) {
-      throw new Error('modify_attribute_value requires target.objectName, target.attributeName, and changes.value');
-    }
-
-    // Find the owner object by name
-    const objectId = ModifierHelpers.findElementByName(model, objectName, 'ObjectName');
-    if (!objectId) {
-      throw new Error(`Object '${objectName}' not found in the model.`);
-    }
-
-    // Search for the ObjectAttribute child owned by this object
-    let found = false;
-    for (const [, element] of Object.entries(model.elements)) {
-      if (
-        element.type === 'ObjectAttribute' &&
-        element.owner === objectId &&
-        element.name?.split('=')[0]?.trim() === attributeName
-      ) {
-        element.name = `${attributeName} = ${newValue}`;
-        found = true;
-        break;
-      }
-    }
-
-    if (!found) {
-      throw new Error(`Attribute '${attributeName}' not found on object '${objectName}'.`);
     }
 
     return model;

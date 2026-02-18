@@ -38,6 +38,7 @@ export class ClassDiagramModifier implements DiagramModifier {
       'add_method',
       'modify_method',
       'add_relationship',
+      'modify_relationship',
       'remove_element'
     ].includes(action);
   }
@@ -70,6 +71,8 @@ export class ClassDiagramModifier implements DiagramModifier {
         return this.modifyMethod(updatedModel, modification);
       case 'add_relationship':
         return this.addRelationship(updatedModel, modification);
+      case 'modify_relationship':
+        return this.modifyRelationship(updatedModel, modification);
       case 'remove_element':
         return this.removeElement(updatedModel, modification);
       default:
@@ -319,11 +322,15 @@ export class ClassDiagramModifier implements DiagramModifier {
       throw new Error('Relationship modifications require both source and target class names.');
     }
 
-    const sourceClassId = this.findClassIdByName(model, sourceClassName);
-    const targetClassId = this.findClassIdByName(model, targetClassName);
+    let sourceClassId = this.findClassIdByName(model, sourceClassName);
+    let targetClassId = this.findClassIdByName(model, targetClassName);
 
-    if (!sourceClassId || !targetClassId) {
-      throw new Error('Could not locate source or target class for relationship.');
+    // Auto-create missing classes so "add a class linked to X" works
+    if (!sourceClassId) {
+      sourceClassId = this.createMinimalClass(model, sourceClassName, targetClassId);
+    }
+    if (!targetClassId) {
+      targetClassId = this.createMinimalClass(model, targetClassName, sourceClassId);
     }
 
     const relationshipId = ModifierHelpers.generateUniqueId('rel');
@@ -359,6 +366,96 @@ export class ClassDiagramModifier implements DiagramModifier {
       ],
       isManuallyLayouted: false
     };
+
+    return model;
+  }
+
+  /**
+   * Modify an existing relationship (multiplicity, type, name/role).
+   * Finds the relationship by id, name, or source+target class pair.
+   */
+  private modifyRelationship(model: BESSERModel, modification: ModelModification): BESSERModel {
+    if (!model.relationships) {
+      throw new Error('No relationships exist in the model to modify.');
+    }
+
+    const changes = modification.changes;
+    const target = modification.target;
+
+    // --- Locate the relationship ---
+    let matchedRelId: string | null = null;
+
+    // 1. By explicit relationship ID
+    if (target.relationshipId && model.relationships[target.relationshipId]) {
+      matchedRelId = target.relationshipId;
+    }
+
+    // 2. By relationship name
+    if (!matchedRelId && target.relationshipName) {
+      const normalizedName = target.relationshipName.trim().toLowerCase();
+      for (const [relId, rel] of Object.entries(model.relationships)) {
+        if ((rel.name || '').trim().toLowerCase() === normalizedName) {
+          matchedRelId = relId;
+          break;
+        }
+      }
+    }
+
+    // 3. By source + target class names
+    if (!matchedRelId) {
+      const sourceClassName = changes.sourceClass || target.sourceClass || target.className;
+      const targetClassName = changes.targetClass || target.targetClass;
+
+      if (sourceClassName && targetClassName) {
+        const sourceClassId = this.findClassIdByName(model, sourceClassName);
+        const targetClassId = this.findClassIdByName(model, targetClassName);
+
+        if (sourceClassId && targetClassId) {
+          for (const [relId, rel] of Object.entries(model.relationships)) {
+            const relSource = rel.source?.element;
+            const relTarget = rel.target?.element;
+            // Match in either direction
+            if (
+              (relSource === sourceClassId && relTarget === targetClassId) ||
+              (relSource === targetClassId && relTarget === sourceClassId)
+            ) {
+              matchedRelId = relId;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (!matchedRelId) {
+      throw new Error(
+        'Could not find the relationship to modify. Provide relationshipId, relationshipName, or sourceClass + targetClass.'
+      );
+    }
+
+    const rel = model.relationships[matchedRelId];
+
+    // --- Apply changes ---
+    if (changes.relationshipType || (changes as any).type) {
+      const newType = this.mapRelationshipType(changes.relationshipType || (changes as any).type);
+      rel.type = newType;
+    }
+
+    if (changes.sourceMultiplicity !== undefined && rel.source) {
+      rel.source.multiplicity = changes.sourceMultiplicity;
+    }
+
+    if (changes.targetMultiplicity !== undefined && rel.target) {
+      rel.target.multiplicity = changes.targetMultiplicity;
+    }
+
+    if (changes.name !== undefined) {
+      rel.name = changes.name;
+    }
+
+    if (changes.roleName !== undefined && rel.target) {
+      rel.target.role = changes.roleName;
+    }
 
     return model;
   }
@@ -430,6 +527,43 @@ export class ClassDiagramModifier implements DiagramModifier {
   // Helper methods
   private findClassIdByName(model: BESSERModel, className: string): string | null {
     return ModifierHelpers.findElementByName(model, className, 'Class');
+  }
+
+  /**
+   * Create a minimal Class element so that add_relationship can reference it.
+   * Positions the new class near an optional neighbour if provided.
+   */
+  private createMinimalClass(model: BESSERModel, className: string, neighbourId?: string | null): string {
+    const classId = ModifierHelpers.generateUniqueId('class');
+    // Place the new class to the right of (or below) the neighbour, or at origin
+    let x = 0;
+    let y = 0;
+    if (neighbourId && model.elements[neighbourId]) {
+      const nb = model.elements[neighbourId];
+      x = (nb.bounds?.x ?? 0) + (nb.bounds?.width ?? 250) + 80;
+      y = nb.bounds?.y ?? 0;
+    } else {
+      // Fallback: find the rightmost class and place to its right
+      for (const el of Object.values(model.elements)) {
+        if (el.type === 'Class') {
+          const right = (el.bounds?.x ?? 0) + (el.bounds?.width ?? 250);
+          if (right + 80 > x) {
+            x = right + 80;
+            y = el.bounds?.y ?? 0;
+          }
+        }
+      }
+    }
+    model.elements[classId] = {
+      id: classId,
+      name: className,
+      type: 'Class',
+      owner: null,
+      bounds: { x, y, width: 220, height: 90 },
+      attributes: [],
+      methods: [],
+    };
+    return classId;
   }
 
   private findAttributeIdByClassAndName(model: BESSERModel, className: string, attributeName?: string): string | null {

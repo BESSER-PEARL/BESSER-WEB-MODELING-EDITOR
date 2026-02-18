@@ -40,6 +40,7 @@ export interface ModelUpdate {
   type: 'single_element' | 'complete_system' | 'modification';
   data: any;
   message: string;
+  replaceExisting?: boolean;
 }
 
 export interface BESSERModel {
@@ -146,7 +147,7 @@ export class UMLModelingService {
   /**
    * Process a complete system specification - now supports all diagram types
    */
-  processSystemSpec(systemSpec: any, diagramType?: string): ModelUpdate {
+  processSystemSpec(systemSpec: any, diagramType?: string, replaceExisting?: boolean): ModelUpdate {
     try {
       const type = (diagramType || this.currentDiagramType) as DiagramType;
       const converter = ConverterFactory.getConverter(type);
@@ -156,7 +157,9 @@ export class UMLModelingService {
         ? completeSystem
         : (() => {
             const currentModel = this.getCurrentModel();
-            const nextPosition = this.getNextLayoutPosition(currentModel);
+            const nextPosition = replaceExisting
+              ? { x: 0, y: 0 }
+              : this.getNextLayoutPosition(currentModel);
             const anchorPosition = this.getLayoutAnchor(completeSystem);
             return this.offsetSystemLayout(completeSystem, {
               x: nextPosition.x - anchorPosition.x,
@@ -167,7 +170,10 @@ export class UMLModelingService {
       return {
         type: 'complete_system',
         data: shiftedSystem,
-        message: `✨ Created complete ${type} system`
+        message: replaceExisting
+          ? `🔄 Replaced with new ${type} system`
+          : `✨ Created complete ${type} system`,
+        replaceExisting: !!replaceExisting,
       };
     } catch (error) {
       // console.error('Error processing system spec:', error);
@@ -227,7 +233,9 @@ export class UMLModelingService {
           updatedModel = this.mergeElementIntoModel(currentModel, update.data);
           break;
         case 'complete_system':
-          updatedModel = this.mergeSystemIntoModel(currentModel, update.data);
+          updatedModel = update.replaceExisting
+            ? update.data  // Replace: use system data as the entire model
+            : this.mergeSystemIntoModel(currentModel, update.data);
           break;
         case 'modification':
           updatedModel = update.data;

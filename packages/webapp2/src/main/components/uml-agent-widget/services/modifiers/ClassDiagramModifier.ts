@@ -38,6 +38,7 @@ export class ClassDiagramModifier implements DiagramModifier {
       'add_method',
       'modify_method',
       'add_relationship',
+      'modify_relationship',
       'remove_element'
     ].includes(action);
   }
@@ -70,6 +71,8 @@ export class ClassDiagramModifier implements DiagramModifier {
         return this.modifyMethod(updatedModel, modification);
       case 'add_relationship':
         return this.addRelationship(updatedModel, modification);
+      case 'modify_relationship':
+        return this.modifyRelationship(updatedModel, modification);
       case 'remove_element':
         return this.removeElement(updatedModel, modification);
       default:
@@ -359,6 +362,96 @@ export class ClassDiagramModifier implements DiagramModifier {
       ],
       isManuallyLayouted: false
     };
+
+    return model;
+  }
+
+  /**
+   * Modify an existing relationship (multiplicity, type, name/role).
+   * Finds the relationship by id, name, or source+target class pair.
+   */
+  private modifyRelationship(model: BESSERModel, modification: ModelModification): BESSERModel {
+    if (!model.relationships) {
+      throw new Error('No relationships exist in the model to modify.');
+    }
+
+    const changes = modification.changes;
+    const target = modification.target;
+
+    // --- Locate the relationship ---
+    let matchedRelId: string | null = null;
+
+    // 1. By explicit relationship ID
+    if (target.relationshipId && model.relationships[target.relationshipId]) {
+      matchedRelId = target.relationshipId;
+    }
+
+    // 2. By relationship name
+    if (!matchedRelId && target.relationshipName) {
+      const normalizedName = target.relationshipName.trim().toLowerCase();
+      for (const [relId, rel] of Object.entries(model.relationships)) {
+        if ((rel.name || '').trim().toLowerCase() === normalizedName) {
+          matchedRelId = relId;
+          break;
+        }
+      }
+    }
+
+    // 3. By source + target class names
+    if (!matchedRelId) {
+      const sourceClassName = changes.sourceClass || target.sourceClass || target.className;
+      const targetClassName = changes.targetClass || target.targetClass;
+
+      if (sourceClassName && targetClassName) {
+        const sourceClassId = this.findClassIdByName(model, sourceClassName);
+        const targetClassId = this.findClassIdByName(model, targetClassName);
+
+        if (sourceClassId && targetClassId) {
+          for (const [relId, rel] of Object.entries(model.relationships)) {
+            const relSource = rel.source?.element;
+            const relTarget = rel.target?.element;
+            // Match in either direction
+            if (
+              (relSource === sourceClassId && relTarget === targetClassId) ||
+              (relSource === targetClassId && relTarget === sourceClassId)
+            ) {
+              matchedRelId = relId;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (!matchedRelId) {
+      throw new Error(
+        'Could not find the relationship to modify. Provide relationshipId, relationshipName, or sourceClass + targetClass.'
+      );
+    }
+
+    const rel = model.relationships[matchedRelId];
+
+    // --- Apply changes ---
+    if (changes.relationshipType || (changes as any).type) {
+      const newType = this.mapRelationshipType(changes.relationshipType || (changes as any).type);
+      rel.type = newType;
+    }
+
+    if (changes.sourceMultiplicity !== undefined && rel.source) {
+      rel.source.multiplicity = changes.sourceMultiplicity;
+    }
+
+    if (changes.targetMultiplicity !== undefined && rel.target) {
+      rel.target.multiplicity = changes.targetMultiplicity;
+    }
+
+    if (changes.name !== undefined) {
+      rel.name = changes.name;
+    }
+
+    if (changes.roleName !== undefined && rel.target) {
+      rel.target.role = changes.roleName;
+    }
 
     return model;
   }

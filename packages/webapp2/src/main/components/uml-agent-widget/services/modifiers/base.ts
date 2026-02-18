@@ -57,6 +57,7 @@ export interface ModelModification {
     | 'add_method'
     | 'modify_method' 
     | 'add_relationship' 
+    | 'modify_relationship'
     | 'remove_element'
     | 'modify_state'
     | 'modify_intent'
