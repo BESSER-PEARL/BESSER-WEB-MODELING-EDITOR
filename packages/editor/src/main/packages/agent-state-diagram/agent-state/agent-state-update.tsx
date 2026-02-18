@@ -225,7 +225,7 @@ class StateUpdate extends Component<Props, State> {
           <Divider />
         </section>
         <section>
-          Bot Action
+          Agent Action
           <div>
             <label>
               <input
