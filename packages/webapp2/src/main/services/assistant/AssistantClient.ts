@@ -14,11 +14,18 @@ import type {
   TypingHandler,
 } from './assistant-types';
 
+interface FileAttachmentPayload {
+  filename: string;
+  content: string; // base64-encoded
+  mimeType: string;
+}
+
 interface QueuedMessage {
   message: string;
   diagramType: string;
   model?: any;
   context?: Partial<AssistantWorkspaceContext>;
+  attachments?: FileAttachmentPayload[];
 }
 
 const createSessionId = (): string => {
@@ -249,14 +256,15 @@ export class AssistantClient {
     diagramType?: string,
     model?: any,
     context?: Partial<AssistantWorkspaceContext>,
+    attachments?: FileAttachmentPayload[],
   ): SendStatus {
     const type = diagramType || 'ClassDiagram';
     if (!this.isConnected || !this.ws) {
-      this.messageQueue.push({ message, diagramType: type, model, context });
+      this.messageQueue.push({ message, diagramType: type, model, context, attachments });
       return 'queued';
     }
     try {
-      this.sendPayload(this.buildUserPayload(message, type, model, context));
+      this.sendPayload(this.buildUserPayload(message, type, model, context, attachments));
       return 'sent';
     } catch (error) {
       console.error('Failed to send assistant message', error);
@@ -347,12 +355,13 @@ export class AssistantClient {
     diagramType: string,
     model?: any,
     contextOverride?: Partial<AssistantWorkspaceContext>,
+    attachments?: FileAttachmentPayload[],
   ): Record<string, any> {
     const baseContext = this.contextProvider?.();
     const context = compactContextPayload(
       mergeContexts(baseContext, contextOverride, diagramType, model),
     );
-    return {
+    const payload: Record<string, any> = {
       action: 'user_message',
       protocolVersion: '2.0',
       clientMode: this.clientMode,
@@ -360,6 +369,10 @@ export class AssistantClient {
       message,
       context,
     };
+    if (attachments && attachments.length > 0) {
+      payload.attachments = attachments;
+    }
+    return payload;
   }
 
   private buildWirePayload(payload: Record<string, any>): Record<string, any> {
@@ -510,7 +523,7 @@ export class AssistantClient {
           return;
         }
         try {
-          this.sendPayload(this.buildUserPayload(item.message, item.diagramType, item.model, item.context));
+          this.sendPayload(this.buildUserPayload(item.message, item.diagramType, item.model, item.context, item.attachments));
         } catch {
           // Re-queue on failure so it's retried on next reconnect.
           this.messageQueue.push(item);

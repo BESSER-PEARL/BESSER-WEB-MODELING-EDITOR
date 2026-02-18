@@ -46,6 +46,7 @@ export interface ModificationChanges {
   source?: string;
   target?: string;
   label?: string;
+  value?: string;
 }
 
 export interface ModelModification {
@@ -63,6 +64,7 @@ export interface ModelModification {
     | 'remove_transition'
     | 'add_state_body'
     | 'modify_object'
+    | 'modify_attribute_value'
     | 'add_link';
   target: ModificationTarget;
   changes: ModificationChanges;

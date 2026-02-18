@@ -732,26 +732,72 @@ export const AssistantWorkspaceDrawer: React.FC<AssistantWorkspaceDrawerProps> =
     };
   }, [isDragging, drawerHeight, isMeasured, closedOffset, totalTravel, open, onOpenChange]);
 
-  const handleSubmit = (event?: { preventDefault?: () => void }) => {
+  const readFileAsBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Strip the data URL prefix (e.g., "data:image/png;base64,")
+        const base64 = result.includes(',') ? result.split(',')[1] : result;
+        resolve(base64);
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
+  const handleSubmit = async (
+    event?: { preventDefault?: () => void },
+    options?: { experimental_attachments?: FileList },
+  ) => {
     event?.preventDefault?.();
     const normalizedInput = inputValue.trim();
-    if (!normalizedInput || isGenerating) {
+    const attachedFiles = options?.experimental_attachments;
+    const hasFiles = attachedFiles && attachedFiles.length > 0;
+
+    if ((!normalizedInput && !hasFiles) || isGenerating) {
       return;
     }
 
-    setMessages((previousMessages) => [...previousMessages, toKitMessage('user', normalizedInput)]);
+    const displayText = hasFiles
+      ? `${normalizedInput || 'Convert this file'} 📎 ${Array.from(attachedFiles!).map((f) => f.name).join(', ')}`
+      : normalizedInput;
+
+    setMessages((previousMessages) => [...previousMessages, toKitMessage('user', displayText)]);
     setInputValue('');
 
+    // Read files as base64 attachments
+    let attachments: Array<{ filename: string; content: string; mimeType: string }> | undefined;
+    if (hasFiles) {
+      try {
+        attachments = await Promise.all(
+          Array.from(attachedFiles!).map(async (file) => ({
+            filename: file.name,
+            content: await readFileAsBase64(file),
+            mimeType: file.type || 'application/octet-stream',
+          })),
+        );
+      } catch (error) {
+        console.error('Failed to read attached files:', error);
+        toast.error('Could not read the attached file(s). Please try again.');
+        return;
+      }
+    }
+
+    const message = normalizedInput || (hasFiles ? 'Convert this file to a diagram' : '');
     const context = buildWorkspaceContext();
     const modelSnapshot = modelingServiceRef.current?.getCurrentModel() || context.activeModel;
     logAssistantFlow('send', 'user_message', {
       action: 'user_message',
       protocolVersion: '2.0',
       clientMode: 'workspace',
-      message: normalizedInput,
+      message,
       context,
+      hasAttachments: !!attachments,
+      attachmentCount: attachments?.length ?? 0,
     });
-    const sendResult = assistantClient.sendMessage(normalizedInput, context.activeDiagramType, modelSnapshot, context);
+    const sendResult = assistantClient.sendMessage(
+      message, context.activeDiagramType, modelSnapshot, context, attachments,
+    );
     logAssistantFlow('send', 'send_result', { sendResult });
     if (sendResult === 'queued') {
       toast.info('Reconnecting to the assistant \u2014 your message will be sent automatically.');
