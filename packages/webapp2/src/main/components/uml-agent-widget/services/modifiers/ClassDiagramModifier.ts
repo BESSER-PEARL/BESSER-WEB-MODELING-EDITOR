@@ -248,6 +248,10 @@ export class ClassDiagramModifier implements DiagramModifier {
       const type = normalizeType(modification.changes.type || parsed.type || 'str');
 
       element.name = `${visibilitySymbol} ${name}: ${type}`;
+    } else {
+      console.warn(
+        `[ClassDiagramModifier] modifyAttribute: could not find attribute '${attributeName || attributeId}' in class '${className}'`
+      );
     }
 
     return model;
@@ -302,6 +306,10 @@ export class ClassDiagramModifier implements DiagramModifier {
       const paramStr = parameters.join(', ');
 
       element.name = `${visibilitySymbol} ${name}(${paramStr}): ${returnType}`;
+    } else {
+      console.warn(
+        `[ClassDiagramModifier] modifyMethod: could not find method '${methodName || methodId}' in class '${className}'`
+      );
     }
 
     return model;
@@ -586,7 +594,8 @@ export class ClassDiagramModifier implements DiagramModifier {
   private parseAttributeLabel(label: string) {
     const trimmed = label || '';
     const visibilitySymbol = trimmed.trim().startsWith('+') ? '+' :
-      trimmed.trim().startsWith('-') ? '-' : '#';
+      trimmed.trim().startsWith('-') ? '-' :
+      trimmed.trim().startsWith('#') ? '#' : '+';
     const withoutVisibility = trimmed.replace(/^([+#-])\s*/, '');
     const [namePart, typePart] = withoutVisibility.split(':').map(part => part?.trim() || '');
     return {
@@ -599,7 +608,8 @@ export class ClassDiagramModifier implements DiagramModifier {
   private parseMethodLabel(label: string) {
     const trimmed = label || '';
     const visibilitySymbol = trimmed.trim().startsWith('+') ? '+' :
-      trimmed.trim().startsWith('-') ? '-' : '#';
+      trimmed.trim().startsWith('-') ? '-' :
+      trimmed.trim().startsWith('#') ? '#' : '+';
     const withoutVisibility = trimmed.replace(/^([+#-])\s*/, '');
     const [signature, returnTypePart] = withoutVisibility.split(':').map(part => part?.trim() || '');
     const [namePart, paramsPart] = signature.split('(');
