@@ -53,6 +53,7 @@ export interface InjectionCommand {
   element?: any;
   systemSpec?: any;
   modification?: any;
+  modifications?: any[];
   model?: any;
   message: string;
   diagramType?: string;

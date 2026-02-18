@@ -334,7 +334,11 @@ export const UMLAgentModeling: React.FC<UMLAgentModelingProps> = ({ onAssistantG
             }
             break;
           case 'modify_model':
-            if (command.modification) {
+            if (Array.isArray(command.modifications) && command.modifications.length > 0) {
+              update = modelingService.processModelModifications(command.modifications as ModelModification[]);
+              const batchLabel = `${command.modifications.length} modifications`;
+              successMessage = `[OK] Applied ${batchLabel} successfully.`;
+            } else if (command.modification) {
               update = modelingService.processModelModification(command.modification as ModelModification);
               const actionLabel = command.modification.action || 'modification';
               successMessage = `[OK] Applied ${actionLabel} successfully.`;

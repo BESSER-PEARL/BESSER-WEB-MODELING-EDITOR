@@ -371,7 +371,9 @@ export const AssistantWorkspaceDrawer: React.FC<AssistantWorkspaceDrawerProps> =
             }
             break;
           case 'modify_model':
-            if (command.modification && typeof command.modification === 'object' && command.modification.action && command.modification.target) {
+            if (Array.isArray(command.modifications) && command.modifications.length > 0) {
+              update = modelingServiceRef.current.processModelModifications(command.modifications as ModelModification[]);
+            } else if (command.modification && typeof command.modification === 'object' && command.modification.action && command.modification.target) {
               update = modelingServiceRef.current.processModelModification(command.modification as ModelModification);
             } else if (command.modification) {
               throw new Error('modify_model payload is missing required action or target fields');

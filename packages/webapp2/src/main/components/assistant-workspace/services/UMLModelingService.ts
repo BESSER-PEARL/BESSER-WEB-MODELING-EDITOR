@@ -218,8 +218,36 @@ export class UMLModelingService {
   }
 
   /**
-   * Inject model update to editor
+   * Process multiple model modifications in a single batch.
+   * Each modification is applied sequentially on the result of the previous one.
    */
+  processModelModifications(modifications: ModelModification[]): ModelUpdate {
+    if (!modifications.length) {
+      throw new Error('No modifications provided');
+    }
+
+    let latestModel = this.getCurrentModel();
+    const diagramType = this.currentDiagramType as DiagramType;
+    const modifier = ModifierFactory.getModifier(diagramType);
+    const applied: string[] = [];
+
+    for (const mod of modifications) {
+      if (!modifier.canHandle(mod.action)) {
+        console.warn(`[UMLModelingService] Skipping unsupported action '${mod.action}' in batch`);
+        continue;
+      }
+      latestModel = modifier.applyModification(latestModel, mod);
+      applied.push(mod.action);
+    }
+
+    return {
+      type: 'modification',
+      data: latestModel,
+      message: `✅ Applied ${applied.length} modification(s) in ${diagramType}: ${applied.join(', ')}`
+    };
+  }
+
+  /**
   async injectToEditor(update: ModelUpdate): Promise<boolean> {
     try {
       const currentModel = this.getCurrentModel();
