@@ -246,6 +246,32 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ onAssistantGen
       window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
     });
 
+  /**
+   * After a diagram switch the Apollon editor + UMLModelingService may still
+   * be mounting.  Poll until the ref is populated (or time out).
+   */
+  const waitForModelingService = async (timeoutMs = 3000): Promise<boolean> => {
+    if (modelingServiceRef.current && typeof modelingServiceRef.current.injectToEditor === 'function') {
+      return true;
+    }
+    const start = Date.now();
+    return new Promise<boolean>((resolve) => {
+      const check = () => {
+        if (modelingServiceRef.current && typeof modelingServiceRef.current.injectToEditor === 'function') {
+          resolve(true);
+          return;
+        }
+        if (Date.now() - start > timeoutMs) {
+          console.warn('[AssistantWidget] Timed out waiting for modelingServiceRef');
+          resolve(false);
+          return;
+        }
+        requestAnimationFrame(check);
+      };
+      requestAnimationFrame(check);
+    });
+  };
+
   const ensureTargetDiagramReady = async (targetType?: string): Promise<boolean> => {
     if (!targetType || targetType === currentDiagramTypeRef.current) return true;
     const umlType = toUMLDiagramType(targetType as any);
@@ -281,6 +307,12 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ onAssistantGen
       const targetDiagramType = command.diagramType || currentDiagramTypeRef.current || 'ClassDiagram';
       const targetIsUml = isUmlDiagramType(targetDiagramType);
       let applied = false;
+
+      // After a diagram switch the editor may still be mounting.
+      // Wait for the modeling service to become available before proceeding.
+      if (targetIsUml && !modelingServiceRef.current) {
+        await waitForModelingService();
+      }
 
       if (targetIsUml && modelingServiceRef.current) {
         let update: ModelUpdate | null = null;

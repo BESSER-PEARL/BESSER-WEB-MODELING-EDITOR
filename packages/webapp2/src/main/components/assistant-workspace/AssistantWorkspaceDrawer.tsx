@@ -296,6 +296,7 @@ export const AssistantWorkspaceDrawer: React.FC<AssistantWorkspaceDrawerProps> =
   }, [messages, isGenerating]);
 
   const waitForSwitchRender = async (): Promise<void> => {
+    // Wait for at least 2 animation frames to let React commit updates.
     await new Promise<void>((resolve) => {
       if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
         setTimeout(resolve, 0);
@@ -304,6 +305,33 @@ export const AssistantWorkspaceDrawer: React.FC<AssistantWorkspaceDrawerProps> =
       window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => resolve());
       });
+    });
+  };
+
+  /**
+   * After a diagram switch, the UMLModelingService is created asynchronously
+   * inside a useEffect that depends on the Apollon editor mounting.  This
+   * helper polls `modelingServiceRef` until it is available (or times out).
+   */
+  const waitForModelingService = async (timeoutMs = 3000): Promise<boolean> => {
+    if (modelingServiceRef.current && typeof modelingServiceRef.current.injectToEditor === 'function') {
+      return true;
+    }
+    const start = Date.now();
+    return new Promise<boolean>((resolve) => {
+      const check = () => {
+        if (modelingServiceRef.current && typeof modelingServiceRef.current.injectToEditor === 'function') {
+          resolve(true);
+          return;
+        }
+        if (Date.now() - start > timeoutMs) {
+          console.warn('[AssistantDrawer] Timed out waiting for modelingServiceRef');
+          resolve(false);
+          return;
+        }
+        requestAnimationFrame(check);
+      };
+      requestAnimationFrame(check);
     });
   };
 
@@ -346,6 +374,12 @@ export const AssistantWorkspaceDrawer: React.FC<AssistantWorkspaceDrawerProps> =
       const targetDiagramType = command.diagramType || currentDiagramTypeRef.current || 'ClassDiagram';
       const targetIsUml = isUmlDiagramType(targetDiagramType);
       let applied = false;
+
+      // After a diagram switch the editor may still be mounting.
+      // Wait for the modeling service to become available before proceeding.
+      if (targetIsUml && !modelingServiceRef.current) {
+        await waitForModelingService();
+      }
 
       if (targetIsUml && modelingServiceRef.current) {
         let update: ModelUpdate | null = null;

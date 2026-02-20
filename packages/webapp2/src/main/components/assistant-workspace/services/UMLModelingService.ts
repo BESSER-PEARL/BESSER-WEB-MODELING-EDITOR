@@ -248,6 +248,8 @@ export class UMLModelingService {
   }
 
   /**
+   * Inject a ModelUpdate into the live editor and persist to Redux.
+   */
   async injectToEditor(update: ModelUpdate): Promise<boolean> {
     try {
       const currentModel = this.getCurrentModel();
