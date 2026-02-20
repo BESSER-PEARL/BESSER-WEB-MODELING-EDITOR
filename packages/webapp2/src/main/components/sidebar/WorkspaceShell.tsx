@@ -133,6 +133,62 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
     setDiagramTitleDraft(diagram?.title ?? '');
   }, [diagram?.id, diagram?.title]);
 
+  /* ---- Assistant-driven export (JSON / BUML) ---- */
+  useEffect(() => {
+    const handleAssistantExport = async (e: Event) => {
+      const format = (e as CustomEvent<{ format: string }>).detail?.format ?? 'json';
+
+      if (!currentProject) {
+        toast.error('Create or load a project first.');
+        return;
+      }
+
+      const freshProject = ProjectStorageRepository.loadProject(currentProject.id) || currentProject;
+
+      if (format === 'buml') {
+        try {
+          const buml = await generateProjectBumlPreview(freshProject);
+          const normalizedName =
+            normalizeProjectName(currentProject.name || 'project')
+              .toLowerCase()
+              .replace(/[^a-z0-9_]/g, '_') || 'project';
+          const blob = new Blob([buml], { type: 'text/x-python' });
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement('a');
+          anchor.href = url;
+          anchor.download = `${normalizedName}_buml.py`;
+          document.body.appendChild(anchor);
+          anchor.click();
+          document.body.removeChild(anchor);
+          URL.revokeObjectURL(url);
+          toast.success('Project exported as B-UML.');
+        } catch (err) {
+          toast.error(`B-UML export failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        }
+      } else {
+        const exportData = {
+          project: buildExportableProjectPayload(freshProject),
+          exportedAt: new Date().toISOString(),
+          version: '2.0.0',
+        };
+        const projectName = sanitizeRepoName(currentProject.name || 'project') || 'project';
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `${projectName}_export.json`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        URL.revokeObjectURL(url);
+        toast.success('Project exported as JSON.');
+      }
+    };
+
+    window.addEventListener('wme:assistant-export-project', handleAssistantExport);
+    return () => window.removeEventListener('wme:assistant-export-project', handleAssistantExport);
+  }, [currentProject, generateProjectBumlPreview]);
+
   const activeUmlType = useMemo(
     () => toUMLDiagramType(currentDiagramType) ?? UMLDiagramType.ClassDiagram,
     [currentDiagramType],
@@ -493,6 +549,16 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
     setGithubRepoPrivate(false);
     setIsDeployDialogOpen(true);
   };
+
+  /* ---- Assistant-driven deploy ---- */
+  useEffect(() => {
+    const handleAssistantDeploy = (_e: Event) => {
+      handleOpenDeployDialog();
+    };
+
+    window.addEventListener('wme:assistant-deploy-app', handleAssistantDeploy);
+    return () => window.removeEventListener('wme:assistant-deploy-app', handleAssistantDeploy);
+  }, [isDeploymentAvailable, isAuthenticated, currentProject]);
 
   const handlePublishToRender = async () => {
     if (!currentProject) {

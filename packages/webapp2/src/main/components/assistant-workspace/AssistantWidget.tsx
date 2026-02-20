@@ -451,6 +451,28 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ onAssistantGen
       return;
     }
 
+    /* ---- Export project (JSON / BUML) ---- */
+    if (payload.action === 'trigger_export') {
+      const format = typeof payload.format === 'string' ? payload.format : 'json';
+      const msg = typeof payload.message === 'string' && payload.message.trim() ? payload.message : `Exporting project as ${format.toUpperCase()}…`;
+      setMessages((prev) => [...prev, toKitMessage('assistant', msg)]);
+      window.dispatchEvent(new CustomEvent('wme:assistant-export-project', { detail: { format } }));
+      return;
+    }
+
+    /* ---- Deploy to Render ---- */
+    if (payload.action === 'trigger_deploy') {
+      const msg = typeof payload.message === 'string' && payload.message.trim() ? payload.message : 'Starting deployment…';
+      setMessages((prev) => [...prev, toKitMessage('assistant', msg)]);
+      window.dispatchEvent(new CustomEvent('wme:assistant-deploy-app', {
+        detail: {
+          platform: payload.platform ?? 'render',
+          config: payload.config ?? {},
+        },
+      }));
+      return;
+    }
+
     if (payload.action === 'agent_error') {
       const message = typeof payload.message === 'string' ? payload.message : 'Something went wrong on the assistant side.';
       setMessages((prev) => [...prev, toKitMessage('assistant', message)]);

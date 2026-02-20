@@ -23,6 +23,8 @@ export type AssistantActionName =
   | 'modify_model'
   | 'switch_diagram'
   | 'trigger_generator'
+  | 'trigger_export'
+  | 'trigger_deploy'
   | 'auto_generate_gui'
   | 'agent_error';
 
