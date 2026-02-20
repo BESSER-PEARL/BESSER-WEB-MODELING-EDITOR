@@ -135,7 +135,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ onAssistantGen
   const { switchDiagramType, currentProject, currentDiagramType } = useProject();
   const location = useLocation();
 
-  const isOnDiagramPage = location.pathname === '/';
+  const isOnEditorPage = ['/', '/graphical-ui-editor', '/quantum-editor'].includes(location.pathname);
 
   const modelingServiceRef = useRef<UMLModelingService | null>(null);
   const onAssistantGenerateRef = useRef(onAssistantGenerate);
@@ -208,24 +208,24 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ onAssistantGen
     }
   }, [currentDiagram, modelingService]);
 
-  /* ---- Hide when not on diagram page ---- */
+  /* ---- Hide when not on an editor page ---- */
 
   useEffect(() => {
-    if (!isOnDiagramPage) {
+    if (!isOnEditorPage) {
       setIsVisible(false);
     }
-  }, [isOnDiagramPage]);
+  }, [isOnEditorPage]);
 
   /* ---- External toggle event ---- */
 
   useEffect(() => {
     const toggle = () => {
-      if (!isOnDiagramPage) return;
+      if (!isOnEditorPage) return;
       setIsVisible((p) => !p);
     };
     window.addEventListener('besser:toggle-agent-widget', toggle);
     return () => window.removeEventListener('besser:toggle-agent-widget', toggle);
-  }, [isOnDiagramPage]);
+  }, [isOnEditorPage]);
 
   /* ---- Scroll to bottom on new messages ---- */
 
@@ -636,7 +636,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ onAssistantGen
 
   /* ---- Render ---- */
 
-  if (!isOnDiagramPage) return null;
+  if (!isOnEditorPage) return null;
 
   return (
     <>
