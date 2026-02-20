@@ -173,10 +173,14 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
     : 'text-xs font-semibold text-slate-700';
 
   const handleSwitchUml = (type: UMLDiagramType) => {
-    if (location.pathname !== '/') {
+    const wasOnDifferentRoute = location.pathname !== '/';
+    if (wasOnDifferentRoute) {
       navigate('/');
     }
-    if (activeUmlType === type) {
+    // Don't skip the switch when returning from a non-UML route (GUI, Quantum,
+    // Settings) because activeUmlType is a fallback value in that case, not the
+    // truly active diagram type.
+    if (!wasOnDifferentRoute && activeUmlType === type) {
       return;
     }
     switchDiagramType(type);
